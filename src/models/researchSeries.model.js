@@ -17,7 +17,7 @@ const researchSeriesSchema = new mongoose.Schema(
 		value: { type: Number, required: true },
 		unit: {
 			type: String,
-			enum: ['usd', 'pct', 'units', 'count'],
+			enum: ['usd', 'pct', 'units', 'count', 'ratio'],
 			default: 'units',
 		},
 		sourceSheet: { type: String },

@@ -632,6 +632,7 @@
 					return;
 				}
 
+				// Recognize supported sheets, including ads/batch sheets
 				const SUPPORTED = [
 					'Market Analysis',
 					'Listing Concentration',
@@ -639,14 +640,20 @@
 					'Origin of Seller',
 					'Publication Time',
 				];
+				const isSupportedSheet = (name) => {
+					const n = String(name || '').toLowerCase();
+					return (
+						SUPPORTED.includes(name) ||
+						n.includes('market-research') ||
+						n.includes('batch') ||
+						n.includes('ads') ||
+						n.includes('christmas')
+					);
+				};
 
 				const sheetButtons = sheets
 					.map((sheet) => {
-						const isSupported =
-							SUPPORTED.includes(sheet.name) ||
-							String(sheet.name)
-								.toLowerCase()
-								.includes('market-research');
+						const isSupported = isSupportedSheet(sheet.name);
 						const note = isSupported
 							? ''
 							: ' <span class="muted" style="font-weight:500">(Chưa xử lý)</span>';
@@ -695,6 +702,12 @@
 						sheetName.toLowerCase().includes('market-research')
 					) {
 						renderMarketResearchPreview(data);
+					} else if (
+						sheetName.toLowerCase().includes('batch') ||
+						sheetName.toLowerCase().includes('ads') ||
+						sheetName.toLowerCase().includes('christmas')
+					) {
+						renderAdsMetricsPreview(data, sheetName);
 					} else {
 						renderUnsupportedPreview(sheetName);
 					}
@@ -714,6 +727,105 @@
 						</div>
 					</div>
 				`;
+			}
+
+			function renderAdsMetricsPreview(data, sheetName) {
+				const el = document.getElementById('sheetPreview');
+				el.innerHTML = `
+					<div style="border: 1px solid #ddd; border-radius: 4px; padding: 12px; background: #f9f9f9;">
+						<h4>Ads Metrics Sheet: ${sheetName}</h4>
+						<p><strong>Rows:</strong> ${data.rows}</p>
+						<p><strong>Columns:</strong> ${data.columns.join(', ')}</p>
+
+						<div style="margin-top: 16px; padding: 12px; background: #e8f5e8; border-radius: 4px; border-left: 4px solid #4caf50;">
+							<h5 style="margin: 0 0 8px 0; color: #2e7d32;">Auto-Processing Configuration</h5>
+							<p style="margin: 4px 0;">Extract CTR (%), CPC ($), ROAS, CR (%), ACOS (%), TACOS (%), CPP ($). Header row is auto-detected; values may be read from row above headers.</p>
+						</div>
+
+						<div style="margin-top: 16px;">
+							<button class="btn-primary" onclick="ingestAdsMetrics('${sheetName}')">
+								Process Ads Metrics Sheet
+							</button>
+							<button onclick="closeSheetModal()" style="margin-left: 8px; background: #666; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer;">
+								Cancel
+							</button>
+						</div>
+					</div>
+				`;
+			}
+
+			async function ingestAdsMetrics(sheetName) {
+				try {
+					const r = await fetch('/api/research/ingest', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							datasetId: currentDatasetId,
+							sheetName,
+							ingest: true,
+						}),
+					});
+					if (!r.ok) {
+						const error = await r.json();
+						alert(
+							'Processing failed: ' +
+								(error.error || 'Unknown error')
+						);
+						return;
+					}
+					const result = await r.json();
+					showAdsMetricsResults(result);
+					closeSheetModal();
+					refresh();
+				} catch (e) {
+					alert('Error processing Ads Metrics: ' + e.message);
+				}
+			}
+
+			function showAdsMetricsResults(result) {
+				const el = document.getElementById('resultsContent');
+				let html = `
+					<div style="background: #e8f5e8; padding: 12px; border-radius: 4px; margin-bottom: 16px;">
+						<h4 style="margin: 0 0 8px 0; color: #2e7d32;"> Ads Metrics processed</h4>
+						<p style="margin: 4px 0;"><strong>Records:</strong> ${Number(
+							result.inserted || 0
+						)}</p>
+					</div>`;
+
+				if (
+					Array.isArray(result.processedData) &&
+					result.processedData.length
+				) {
+					html += `<div style="border: 1px solid #ddd; border-radius: 4px;">
+						<table style="width: 100%; border-collapse: collapse;">
+							<thead>
+								<tr style="background: #f5f5f5;">
+									<th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Metric</th>
+									<th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Value</th>
+									<th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Unit</th>
+								</tr>
+							</thead>
+							<tbody>`;
+					for (const row of result.processedData) {
+						html += `
+							<tr>
+								<td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: 600;">${row.metric.toUpperCase()}</td>
+								<td style="padding: 8px; border-bottom: 1px solid #eee; color:#2e7d32;">${Number(
+									row.value
+								).toLocaleString()}</td>
+								<td style="padding: 8px; border-bottom: 1px solid #eee;">${row.unit}</td>
+							</tr>`;
+					}
+					html += `</tbody></table></div>`;
+				}
+
+				html += `
+					<div style="margin-top: 16px; text-align: right;">
+						<button onclick="closeResultsModal()" class="btn-primary" style="padding: 8px 16px;">Close</button>
+					</div>`;
+
+				el.innerHTML = html;
+				document.getElementById('resultsModal').style.display = 'block';
 			}
 
 			function renderMarketAnalysisPreview(data) {
@@ -828,7 +940,7 @@
 					{ code: 'fba_fee', name: 'FBA Fee ($)', unit: 'usd' },
 					{ code: 'ctr', name: 'CTR %', unit: 'pct' },
 					{ code: 'cpc', name: 'CPC ($)', unit: 'usd' },
-					{ code: 'roas', name: 'ROAS', unit: 'units' },
+					{ code: 'roas', name: 'ROAS', unit: 'ratio' },
 					{ code: 'cr', name: 'CR %', unit: 'pct' },
 					{ code: 'acos', name: 'ACOS %', unit: 'pct' },
 					{ code: 'tacos', name: 'TACOS %', unit: 'pct' },

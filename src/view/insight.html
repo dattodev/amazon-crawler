@@ -360,6 +360,14 @@
 				{ code: 'profit', name: 'Profit ($)', unit: 'usd' },
 				{ code: 'margin', name: 'Margin (%)', unit: 'pct' },
 				{ code: 'roi', name: 'ROI (%)', unit: 'pct' },
+				// Ads metrics (new)
+				{ code: 'ctr', name: 'CTR (%)', unit: 'pct' },
+				{ code: 'cpc', name: 'CPC ($)', unit: 'usd' },
+				{ code: 'roas', name: 'ROAS', unit: 'ratio' },
+				{ code: 'cr', name: 'CR (%)', unit: 'pct' },
+				{ code: 'acos', name: 'ACOS (%)', unit: 'pct' },
+				{ code: 'tacos', name: 'TACOS (%)', unit: 'pct' },
+				{ code: 'cpp', name: 'CPP ($)', unit: 'usd' },
 
 				// LOWER IS BETTER metrics
 				{
@@ -412,7 +420,14 @@
 					if (val >= 1000) return `${(val / 1000).toFixed(0)}k`;
 					return `${Number(val).toFixed(0)}`;
 				}
-				if (unit === 'pct') return `${Number(val).toFixed(0)}%`;
+				if (unit === 'pct') {
+					const pct = val < 1 ? val * 100 : val;
+					const digits = pct < 10 ? 2 : 0;
+					return `${Number(pct).toFixed(digits)}%`;
+				}
+				if (unit === 'ratio') {
+					return `${Number(val).toFixed(2)}x`;
+				}
 				return String(val);
 			}
 
@@ -695,22 +710,17 @@
 						const v = Number(data.category.fbaFeeUsd);
 						if (!Number.isNaN(v)) return v;
 					}
-					// Fallback to metricsSummary
+					// Fallback to metricsSummary ONLY when month matches exactly
 					if (Array.isArray(data?.metricsSummary)) {
 						const ms = data.metricsSummary.find(
 							(x) => x.metric === metricCode
 						);
-						if (ms && typeof ms.latestValue === 'number') {
-							// Treat some metrics as constant across months if sparse
-							if (
-								metricCode === 'referral_fee' ||
-								metricCode === 'listing_concentration' ||
-								ms.latestBucket === 'overall' ||
-								!ms.latestBucket ||
-								ms.latestBucket === bucket
-							) {
-								return ms.latestValue;
-							}
+						if (
+							ms &&
+							typeof ms.latestValue === 'number' &&
+							ms.latestBucket === bucket
+						) {
+							return ms.latestValue;
 						}
 					}
 					return null;
@@ -756,7 +766,7 @@
 										fillAllBuckets = true;
 									}
 								}
-								// B) Latest from metricsSummary (any metric)
+								// B) Latest from metricsSummary (only if bucket matches)
 								if (
 									constantVal == null &&
 									Array.isArray(data?.metricsSummary)
@@ -766,16 +776,12 @@
 									);
 									if (
 										ms &&
-										typeof ms.latestValue === 'number'
+										typeof ms.latestValue === 'number' &&
+										ms.latestBucket &&
+										buckets.includes(ms.latestBucket)
 									) {
-										constantVal = ms.latestValue;
-										// For referral_fee and listing_concentration, treat as constant when sparse
-										fillAllBuckets =
-											def.code === 'referral_fee' ||
-											def.code ===
-												'listing_concentration' ||
-											ms.latestBucket === 'overall' ||
-											!ms.latestBucket;
+										// do not spread across months; only use exact bucket later per-cell
+										constantVal = null;
 									}
 								}
 								// C) Try datasets[].metrics overall bucket (legacy)

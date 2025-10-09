@@ -396,7 +396,9 @@ function renderSidebar(sellers, categories, sources) {
 		const detailLink = id
 			? `<a href="/dashboard/insight.html?id=${id}" target="_blank" class="detail-link" style="margin-left:8px;font-size:12px;color:#2278d0;text-decoration:none;">chi tiết</a>`
 			: '';
-		categoryHtml += `<label class="filter-option"><input type="checkbox" name="category" value="${category}"><span>${category}</span><span class="count">0</span>${detailLink}</label>`;
+		categoryHtml += `<label class="filter-option"><input type="checkbox" name="category" value="${category}"><span>${
+			category.length > 10 ? category.substring(0, 10) + '...' : category
+		}</span><span class="count">0</span>${detailLink}</label>`;
 	});
 
 	if (categories.length > 5) {

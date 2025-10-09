@@ -16,6 +16,42 @@ const router = express.Router();
 // Helper function to handle Market Analysis sheet
 async function handleMarketAnalysisSheet(dataset, rows, header, res) {
 	try {
+		// Some Market Analysis sheets may have one or more title rows above the header.
+		// Re-detect the header row by looking for expected column keywords.
+		const EXPECTED_MARKET_COL_KEYS = [
+			'avg. monthly unit sales',
+			'avg monthly unit sales',
+			'avg. monthly revenue',
+			'avg monthly revenue',
+			'avg. price',
+			'avg price',
+			'avg. ratings',
+			'avg ratings',
+			'avg. rating',
+			'avg rating',
+			'sample size',
+			'sample type',
+		];
+		let headerRowIdx = 0;
+		let bestMatchCount = -1;
+		for (let i = 0; i < Math.min(rows.length, 10); i++) {
+			const r = rows[i] || [];
+			let matches = 0;
+			for (const cell of r) {
+				const s = String(cell || '').toLowerCase();
+				if (EXPECTED_MARKET_COL_KEYS.some((k) => s.includes(k)))
+					matches++;
+			}
+			if (matches > bestMatchCount) {
+				bestMatchCount = matches;
+				headerRowIdx = i;
+			}
+		}
+		if (headerRowIdx !== 0) {
+			header = (rows[headerRowIdx] || []).map((h) =>
+				String(h || '').trim()
+			);
+		}
 		// Preload latest FBA fee for this category (overall constant)
 		let latestFbaFeeUsd = 0;
 		try {
@@ -156,8 +192,8 @@ async function handleMarketAnalysisSheet(dataset, rows, header, res) {
 
 		const docs = [];
 
-		// Process each row (skip header)
-		for (let r = 1; r < rows.length; r++) {
+		// Process each row (skip detected header row)
+		for (let r = headerRowIdx + 1; r < rows.length; r++) {
 			const row = rows[r];
 			const rawTime = row[timeColIdx];
 			const rawSales = row[salesColIdx];
@@ -167,6 +203,11 @@ async function handleMarketAnalysisSheet(dataset, rows, header, res) {
 			const rawPrice = row[priceColIdx];
 			const rawRatings = row[ratingsColIdx];
 			const rawRating = row[ratingColIdx];
+
+			// Restrict to Sample Type = "All" only
+			const sampleTypeStr = String(rawSampleType || '').trim();
+			const isAllSample = /^all$/i.test(sampleTypeStr);
+			if (!isAllSample) continue;
 
 			if (
 				rawTime == null ||
@@ -258,7 +299,7 @@ async function handleMarketAnalysisSheet(dataset, rows, header, res) {
 				unit: 'units',
 				sourceSheet: 'Market Analysis',
 				sampleSize: sampleSize,
-				sampleType: String(rawSampleType).trim(),
+				sampleType: sampleTypeStr,
 			});
 
 			// Add Revenue ($) record
@@ -271,7 +312,7 @@ async function handleMarketAnalysisSheet(dataset, rows, header, res) {
 				unit: 'usd',
 				sourceSheet: 'Market Analysis',
 				sampleSize: 100, // Revenue uses fixed 100 multiplier
-				sampleType: String(rawSampleType).trim(),
+				sampleType: sampleTypeStr,
 			});
 
 			// Add Avg. Price($) record
@@ -284,7 +325,7 @@ async function handleMarketAnalysisSheet(dataset, rows, header, res) {
 				unit: 'usd',
 				sourceSheet: 'Market Analysis',
 				sampleSize: sampleSize,
-				sampleType: String(rawSampleType).trim(),
+				sampleType: sampleTypeStr,
 			});
 
 			// Compute Referral Fee using referral rules (dashboard logic)
@@ -429,7 +470,7 @@ async function handleMarketAnalysisSheet(dataset, rows, header, res) {
 					unit: 'usd',
 					sourceSheet: 'Market Analysis',
 					sampleSize: sampleSize,
-					sampleType: String(rawSampleType).trim(),
+					sampleType: sampleTypeStr,
 					feePercent: referralFeePercent,
 					basePrice: priceValue,
 				});
@@ -505,7 +546,7 @@ async function handleMarketAnalysisSheet(dataset, rows, header, res) {
 				unit: 'count',
 				sourceSheet: 'Market Analysis',
 				sampleSize: sampleSize,
-				sampleType: String(rawSampleType).trim(),
+				sampleType: sampleTypeStr,
 			});
 
 			// Add Avg. Rating record
@@ -518,7 +559,7 @@ async function handleMarketAnalysisSheet(dataset, rows, header, res) {
 				unit: 'count',
 				sourceSheet: 'Market Analysis',
 				sampleSize: sampleSize,
-				sampleType: String(rawSampleType).trim(),
+				sampleType: sampleTypeStr,
 			});
 		}
 
@@ -543,9 +584,10 @@ async function handleMarketAnalysisSheet(dataset, rows, header, res) {
 			{ $set: { status: 'ready' } }
 		);
 
-		// Group data by sample type for display
+		// Group data by sample type for display (restrict to All)
 		const groupedData = {};
 		docs.forEach((doc) => {
+			if (!/^all$/i.test(String(doc.sampleType || ''))) return;
 			const key = doc.sampleType;
 			if (!groupedData[key]) {
 				groupedData[key] = {
@@ -977,9 +1019,359 @@ async function handleListingConcentrationSheet(dataset, rows, header, res) {
 	}
 }
 
+// Helper function to handle Ads metrics sheet (batch files)
+async function handleAdsMetricsSheet(dataset, rows, header, res) {
+	try {
+		// Determine the actual header row: some sheets put values ABOVE the header labels
+		const EXPECTED_COL_KEYS = [
+			'ctr',
+			'cpc',
+			'roas',
+			'cr',
+			'acos',
+			'tacos',
+			'cpp',
+			'clickshare',
+		];
+		let headerRowIdx = 0;
+		let bestMatch = -1;
+		for (let i = 0; i < Math.min(rows.length, 10); i++) {
+			const row = rows[i] || [];
+			let matches = 0;
+			for (const cell of row) {
+				const s = String(cell || '').toLowerCase();
+				if (EXPECTED_COL_KEYS.some((k) => s.includes(k))) matches++;
+			}
+			if (matches > bestMatch) {
+				bestMatch = matches;
+				headerRowIdx = i;
+			}
+		}
+		const hdr = (rows[headerRowIdx] || []).map((h) =>
+			String(h || '').trim()
+		);
+		const valueRowAbove = headerRowIdx > 0 ? rows[headerRowIdx - 1] : null;
+
+		// Find columns by name patterns (case-insensitive) using detected header
+		const findColumnIndex = (patterns) => {
+			return hdr.findIndex((h) => {
+				const colName = String(h || '')
+					.toLowerCase()
+					.trim();
+				return patterns.some((pattern) =>
+					colName.includes(pattern.toLowerCase())
+				);
+			});
+		};
+
+		// Find CTR column
+		const ctrIdx = findColumnIndex(['ctr']);
+		// Find CPC column
+		const cpcIdx = findColumnIndex(['cpc']);
+		// Find ROAS column
+		const roasIdx = findColumnIndex(['roas']);
+		// Find CR column (CR_click or CR_search)
+		const crIdx = findColumnIndex(['cr_click', 'cr_search', 'cr']);
+		// Find ACOS column
+		const acosIdx = findColumnIndex(['acos']);
+		// Find TACOS column
+		const tacosIdx = findColumnIndex(['tacos']);
+		// Find CPP column
+		const cppIdx = findColumnIndex(['cpp']);
+
+		// Check if we have at least some of the required columns
+		const hasRequiredColumns = [
+			ctrIdx,
+			cpcIdx,
+			roasIdx,
+			crIdx,
+			acosIdx,
+			tacosIdx,
+			cppIdx,
+		].some((idx) => idx >= 0);
+
+		if (!hasRequiredColumns) {
+			return res.status(400).json({
+				error: 'No ads metrics columns found. Expected: CTR, CPC, ROAS, CR, ACOS, TACOS, CPP',
+			});
+		}
+
+		const docs = [];
+		let processedRows = 0;
+
+		// Decide which rows to process: if values are above the header, use that single row
+		const rowsToProcess = valueRowAbove
+			? [valueRowAbove]
+			: rows.slice(headerRowIdx + 1);
+
+		// Process rows
+		for (const row of rowsToProcess) {
+			// Skip empty rows
+			if (
+				!row ||
+				row.every(
+					(cell) => cell === null || cell === '' || cell === undefined
+				)
+			) {
+				continue;
+			}
+
+			// Use dataset timeRange.from from filename instead of Time column
+			let bucket = dataset.timeRange?.from || 'overall';
+
+			// Helper function to parse and clean values
+			const parseValue = (rawValue, isPercentage = false) => {
+				if (rawValue == null || rawValue === '') return null;
+
+				let value = rawValue;
+				if (typeof value === 'string') {
+					// Remove common formatting characters
+					value = value.replace(/[$,\s%]/g, '');
+					value = parseFloat(value);
+				}
+
+				if (typeof value !== 'number' || isNaN(value)) return null;
+
+				// Convert percentage to decimal if needed
+				if (isPercentage && value > 1) {
+					value = value / 100;
+				}
+
+				return value;
+			};
+
+			// Process CTR
+			if (ctrIdx >= 0) {
+				const ctrValue = parseValue(row[ctrIdx], true);
+				if (ctrValue != null) {
+					docs.push({
+						datasetId: dataset._id,
+						categoryId: dataset.categoryId,
+						metric: 'ctr',
+						bucket,
+						value: ctrValue,
+						unit: 'pct',
+						sourceSheet: 'Ads Metrics',
+					});
+				}
+			}
+
+			// Process CPC
+			if (cpcIdx >= 0) {
+				const cpcValue = parseValue(row[cpcIdx]);
+				if (cpcValue != null) {
+					docs.push({
+						datasetId: dataset._id,
+						categoryId: dataset.categoryId,
+						metric: 'cpc',
+						bucket,
+						value: cpcValue,
+						unit: 'usd',
+						sourceSheet: 'Ads Metrics',
+					});
+				}
+			}
+
+			// Process ROAS
+			if (roasIdx >= 0) {
+				const roasValue = parseValue(row[roasIdx]);
+				if (roasValue != null) {
+					docs.push({
+						datasetId: dataset._id,
+						categoryId: dataset.categoryId,
+						metric: 'roas',
+						bucket,
+						value: roasValue,
+						unit: 'ratio',
+						sourceSheet: 'Ads Metrics',
+					});
+				}
+			}
+
+			// Process CR (Conversion Rate)
+			if (crIdx >= 0) {
+				const crValue = parseValue(row[crIdx], true);
+				if (crValue != null) {
+					docs.push({
+						datasetId: dataset._id,
+						categoryId: dataset.categoryId,
+						metric: 'cr',
+						bucket,
+						value: crValue,
+						unit: 'pct',
+						sourceSheet: 'Ads Metrics',
+					});
+				}
+			}
+
+			// Process ACOS
+			if (acosIdx >= 0) {
+				const acosValue = parseValue(row[acosIdx], true);
+				if (acosValue != null) {
+					docs.push({
+						datasetId: dataset._id,
+						categoryId: dataset.categoryId,
+						metric: 'acos',
+						bucket,
+						value: acosValue,
+						unit: 'pct',
+						sourceSheet: 'Ads Metrics',
+					});
+				}
+			}
+
+			// Process TACOS
+			if (tacosIdx >= 0) {
+				const tacosValue = parseValue(row[tacosIdx], true);
+				if (tacosValue != null) {
+					docs.push({
+						datasetId: dataset._id,
+						categoryId: dataset.categoryId,
+						metric: 'tacos',
+						bucket,
+						value: tacosValue,
+						unit: 'pct',
+						sourceSheet: 'Ads Metrics',
+					});
+				}
+			}
+
+			// Process CPP
+			if (cppIdx >= 0) {
+				const cppValue = parseValue(row[cppIdx]);
+				if (cppValue != null) {
+					docs.push({
+						datasetId: dataset._id,
+						categoryId: dataset.categoryId,
+						metric: 'cpp',
+						bucket,
+						value: cppValue,
+						unit: 'usd',
+						sourceSheet: 'Ads Metrics',
+					});
+				}
+			}
+
+			processedRows++;
+		}
+
+		if (docs.length === 0) {
+			return res.status(400).json({
+				error: 'No valid ads metrics data found in sheet',
+			});
+		}
+
+		// Clear existing ads metrics data for this dataset
+		await ResearchSeries.deleteMany({
+			datasetId: dataset._id,
+			sourceSheet: 'Ads Metrics',
+		});
+
+		// Insert new data
+		await ResearchSeries.insertMany(docs);
+
+		// Update dataset status
+		await ResearchDataset.updateOne(
+			{ _id: dataset._id },
+			{ $set: { status: 'ready' } }
+		);
+
+		// Update category with latest ads metrics as defaults
+		try {
+			const latestMetrics = {};
+			docs.forEach((doc) => {
+				if (
+					!latestMetrics[doc.metric] ||
+					doc.createdAt > latestMetrics[doc.metric].createdAt
+				) {
+					latestMetrics[doc.metric] = doc;
+				}
+			});
+
+			const updateFields = {};
+			if (latestMetrics.ctr)
+				updateFields.defaultCtr = latestMetrics.ctr.value;
+			if (latestMetrics.cpc)
+				updateFields.defaultCpc = latestMetrics.cpc.value;
+			if (latestMetrics.roas)
+				updateFields.defaultRoas = latestMetrics.roas.value;
+			if (latestMetrics.cr)
+				updateFields.defaultCr = latestMetrics.cr.value;
+			if (latestMetrics.acos)
+				updateFields.defaultAcos = latestMetrics.acos.value;
+			if (latestMetrics.tacos)
+				updateFields.defaultTacos = latestMetrics.tacos.value;
+			if (latestMetrics.cpp)
+				updateFields.defaultCpp = latestMetrics.cpp.value;
+
+			if (Object.keys(updateFields).length > 0) {
+				await ResearchCategory.updateOne(
+					{ _id: dataset.categoryId },
+					{ $set: updateFields }
+				);
+			}
+		} catch (e) {
+			// Non-fatal error, continue
+			console.warn(
+				'Failed to update category with ads metrics defaults:',
+				e
+			);
+		}
+
+		// Group data by metric for display
+		const groupedData = {};
+		docs.forEach((doc) => {
+			if (!groupedData[doc.metric]) {
+				groupedData[doc.metric] = {
+					metric: doc.metric,
+					value: doc.value,
+					unit: doc.unit,
+					bucket: doc.bucket,
+				};
+			}
+		});
+
+		res.json({
+			inserted: docs.length,
+			message: `Processed ${docs.length} ads metrics records from ${processedRows} rows`,
+			processedData: Object.values(groupedData),
+		});
+	} catch (e) {
+		console.error('Ads metrics processing failed:', e);
+		res.status(500).json({
+			error: 'Failed to process ads metrics sheet',
+		});
+	}
+}
+
 // Helper: compute dimensional tier and FBA fee from Avg.Weight(lb) and Avg.Volume(in^3)
 async function handleMarketResearchWeightSheet(dataset, rows, header, res) {
 	try {
+		// Auto-detect header row for Market-research variants (e.g., Market-research(1)-US)
+		const EXPECTED_KEYS = [
+			'avg.weight',
+			'avg weight',
+			'avg.volume',
+			'avg volume',
+		];
+		let headerRowIdx = 0;
+		let best = -1;
+		for (let i = 0; i < Math.min(rows.length, 10); i++) {
+			const r = rows[i] || [];
+			let hits = 0;
+			for (const cell of r) {
+				const s = String(cell || '').toLowerCase();
+				if (EXPECTED_KEYS.some((k) => s.includes(k))) hits++;
+			}
+			if (hits > best) {
+				best = hits;
+				headerRowIdx = i;
+			}
+		}
+		const hdr = (rows[headerRowIdx] || []).map((h) =>
+			String(h || '').trim()
+		);
+
 		// Helper: normalize tier naming similar to frontend dashboard.js
 		const normalizeTierName = (t) => {
 			if (!t) return t;
@@ -992,9 +1384,9 @@ async function handleMarketResearchWeightSheet(dataset, rows, header, res) {
 				return 'Oversize';
 			return t;
 		};
-		// find headers by tolerant matching
+		// find headers by tolerant matching on detected header row
 		const findIdx = (pred) =>
-			header.findIndex((h) => pred(String(h).toLowerCase()));
+			hdr.findIndex((h) => pred(String(h).toLowerCase()));
 		const weightIdx = findIdx(
 			(l) => l.includes('avg.weight') || l.includes('avg weight')
 		);
@@ -1010,7 +1402,7 @@ async function handleMarketResearchWeightSheet(dataset, rows, header, res) {
 		// parse first data row (sheet is usually summary)
 		let avgWeightLb = null;
 		let avgVolumeIn3 = null;
-		for (let r = 1; r < rows.length; r++) {
+		for (let r = headerRowIdx + 1; r < rows.length; r++) {
 			const w = rows[r][weightIdx];
 			const v = rows[r][volumeIdx];
 			if (w == null || v == null || w === '' || v === '') continue;
@@ -1439,6 +1831,29 @@ async function autoIngestStandardSheets(dataset) {
 				} catch (e) {}
 			}
 		}
+
+		// Also attempt Ads metrics sheet if present by fuzzy name (batch files)
+		const adsName = (workbook.SheetNames || []).find(
+			(n) =>
+				String(n).toLowerCase().includes('batch') ||
+				String(n).toLowerCase().includes('ads') ||
+				String(n).toLowerCase().includes('christmas')
+		);
+		if (adsName) {
+			const rows = readSheetAsArray(workbook, adsName);
+			if (rows.length) {
+				const header = rows[0].map((h) => String(h || '').trim());
+				const silentRes = createSilentRes();
+				try {
+					await handleAdsMetricsSheet(
+						dataset,
+						rows,
+						header,
+						silentRes
+					);
+				} catch (e) {}
+			}
+		}
 	} catch (e) {
 		// ignore auto ingest errors
 	}
@@ -1622,6 +2037,15 @@ router.post('/research/ingest', async (req, res) => {
 			return handleMarketResearchWeightSheet(dataset, rows, header, res);
 		}
 
+		// Special handling for ads metrics sheets (batch files)
+		if (
+			String(sheetName).toLowerCase().includes('batch') ||
+			String(sheetName).toLowerCase().includes('ads') ||
+			String(sheetName).toLowerCase().includes('christmas')
+		) {
+			return handleAdsMetricsSheet(dataset, rows, header, res);
+		}
+
 		// Full ingestion logic
 		if (!bucketColumn || !Array.isArray(metricMappings)) {
 			return res.status(400).json({
@@ -1739,9 +2163,22 @@ router.get('/research/metrics-summary', async (req, res) => {
 			if (from) match.bucket.$gte = from;
 			if (to) match.bucket.$lte = to;
 		}
-		const itemsRaw = await ResearchSeries.find({ ...match })
+		let itemsRaw = await ResearchSeries.find({ ...match })
 			.sort({ bucket: 1 })
 			.lean();
+
+		// Enforce Sample Type = All for Market Analysis metrics
+		const REQUIRE_ALL = new Set([
+			'sales_units',
+			'revenue',
+			'avg_price',
+			'avg_ratings',
+			'avg_rating',
+		]);
+		itemsRaw = itemsRaw.filter((it) => {
+			if (!REQUIRE_ALL.has(it.metric)) return true;
+			return /^all$/i.test(String(it.sampleType || ''));
+		});
 		const ds = await ResearchDataset.findById(datasetId).lean();
 		const defaultMonth = ds?.timeRange?.from || null;
 		const coerceMonth = (b) => {
@@ -1753,35 +2190,39 @@ router.get('/research/metrics-summary', async (req, res) => {
 			return defaultMonth || s || null;
 		};
 
-		// Prefer sampleType=All for sales_units within the same month
+		// Prefer sampleType=All for ALL metrics within the same month
 		const items = [];
-		if (metricArr.includes('sales_units')) {
-			const byMonth = new Map();
-			for (const it of itemsRaw) {
-				const month = coerceMonth(it.bucket);
-				if (!month) continue;
-				if (it.metric !== 'sales_units') {
-					items.push({ ...it, bucket: month });
+		const byMetricMonth = new Map(); // key: metric|month -> best item
+		for (const it of itemsRaw) {
+			const month = coerceMonth(it.bucket);
+			if (!month) continue;
+			const key = `${it.metric}|${month}`;
+			const prev = byMetricMonth.get(key);
+			const isAll = /all/i.test(it.sampleType || '');
+			if (!prev) {
+				byMetricMonth.set(key, it);
+				continue;
+			}
+			const prevIsAll = /all/i.test(prev.sampleType || '');
+			if (!prevIsAll && isAll) {
+				byMetricMonth.set(key, it);
+				continue;
+			}
+			if (!prevIsAll && !isAll) {
+				const prevSize = Number(prev.sampleSize) || 0;
+				const curSize = Number(it.sampleSize) || 0;
+				if (curSize > prevSize) {
+					byMetricMonth.set(key, it);
 					continue;
 				}
-				const key = month;
-				const prev = byMonth.get(key);
-				const isAll = /all/i.test(it.sampleType || '');
-				if (!prev) byMonth.set(key, it);
-				else if (/all/i.test(prev.sampleType || '') ? false : isAll)
-					byMonth.set(key, it);
-				else if (
-					!/all/i.test(prev.sampleType || '') &&
-					(Number(it.sampleSize) || 0) >
-						(Number(prev.sampleSize) || 0)
-				)
-					byMonth.set(key, it);
 			}
-			for (const sel of byMonth.values())
-				items.push({ ...sel, bucket: coerceMonth(sel.bucket) });
-		} else {
-			for (const it of itemsRaw)
-				items.push({ ...it, bucket: coerceMonth(it.bucket) });
+			// As final tiebreaker, pick latest createdAt
+			if (new Date(it.createdAt) > new Date(prev.createdAt)) {
+				byMetricMonth.set(key, it);
+			}
+		}
+		for (const sel of byMetricMonth.values()) {
+			items.push({ ...sel, bucket: coerceMonth(sel.bucket) });
 		}
 
 		const timeSet = new Set(items.map((x) => x.bucket));
@@ -2027,6 +2468,51 @@ router.get('/research/category/:id', async (req, res) => {
 			.filter((b) => /^\d{4}-\d{2}$/.test(String(b)))
 			.sort((a, b) => a.localeCompare(b));
 
+		// Pre-compute helpers for derived metrics
+		const pickAll = (arr) =>
+			(arr || []).find(
+				(m) => String(m.sampleType || '').toLowerCase() === 'all'
+			);
+		// Build maps from bucket -> value for core inputs
+		const byMetricBucket = {};
+		for (const m of allMetrics) {
+			if (!byMetricBucket[m.metric]) byMetricBucket[m.metric] = {};
+			if (!byMetricBucket[m.metric][m.bucket])
+				byMetricBucket[m.metric][m.bucket] = [];
+			byMetricBucket[m.metric][m.bucket].push(m);
+		}
+		const avgPriceByBucket = {};
+		const referralByBucket = {};
+		Object.keys(byMetricBucket).forEach((metricKey) => {
+			if (metricKey === 'avg_price' || metricKey === 'referral_fee') {
+				for (const [bucket, arr] of Object.entries(
+					byMetricBucket[metricKey]
+				)) {
+					const take = pickAll(arr) || arr[0];
+					if (metricKey === 'avg_price')
+						avgPriceByBucket[bucket] = take;
+					if (metricKey === 'referral_fee')
+						referralByBucket[bucket] = take;
+				}
+			}
+		});
+
+		// Compute derived metrics per month using user formula
+		// Fetch latest CPP overall once
+		const latestCppDoc = await ResearchSeries.findOne({
+			categoryId,
+			metric: 'cpp',
+		})
+			.sort({ createdAt: -1 })
+			.lean();
+		const cppOverall =
+			(latestCppDoc && typeof latestCppDoc.value === 'number'
+				? latestCppDoc.value
+				: null) ??
+			category.defaultCpp ??
+			0;
+		const fbaFeeOverall = category.fbaFeeUsd ?? 0;
+
 		// Build time series data for each metric across all months
 		const timeSeriesData = {};
 		for (const [metricKey, summary] of Object.entries(metricsSummary)) {
@@ -2048,40 +2534,40 @@ router.get('/research/category/:id', async (req, res) => {
 			}
 
 			// For each time bucket, get the best value (prioritize by sampleType and sampleSize)
+			const REQUIRE_ALL = new Set([
+				'sales_units',
+				'revenue',
+				'avg_price',
+				'avg_ratings',
+				'avg_rating',
+				'referral_fee',
+			]);
 			for (const bucket of allBuckets) {
 				if (metricByBucket[bucket]) {
 					const bucketMetrics = metricByBucket[bucket];
 
-					// For sales_units, prioritize "All" sampleType, then largest sampleSize
-					if (metricKey === 'sales_units') {
+					// For Market Analysis metrics, prioritize All; otherwise largest sampleSize
+					if (REQUIRE_ALL.has(metricKey)) {
 						const allSample = bucketMetrics.find(
-							(m) => m.sampleType === 'All'
+							(m) => String(m.sampleType).toLowerCase() === 'all'
 						);
-						if (allSample) {
-							timeSeriesData[metricKey].timeSeries.push({
-								bucket: bucket,
-								value: allSample.value,
-								sampleType: allSample.sampleType,
-								sampleSize: allSample.sampleSize,
-								createdAt: allSample.createdAt,
-							});
-						} else {
-							// Find the one with largest sampleSize
-							const best = bucketMetrics.reduce((prev, current) =>
-								prev.sampleSize > current.sampleSize
+						const pick =
+							allSample ||
+							bucketMetrics.reduce((prev, current) =>
+								(prev.sampleSize || 0) >
+								(current.sampleSize || 0)
 									? prev
 									: current
 							);
-							timeSeriesData[metricKey].timeSeries.push({
-								bucket: bucket,
-								value: best.value,
-								sampleType: best.sampleType,
-								sampleSize: best.sampleSize,
-								createdAt: best.createdAt,
-							});
-						}
+						timeSeriesData[metricKey].timeSeries.push({
+							bucket: bucket,
+							value: pick.value,
+							sampleType: pick.sampleType,
+							sampleSize: pick.sampleSize,
+							createdAt: pick.createdAt,
+						});
 					} else {
-						// For other metrics, just take the first one (they should be the same)
+						// Non-market metrics: take first (only one per bucket expected)
 						const metric = bucketMetrics[0];
 						timeSeriesData[metricKey].timeSeries.push({
 							bucket: bucket,
@@ -2094,6 +2580,40 @@ router.get('/research/category/:id', async (req, res) => {
 				}
 			}
 		}
+
+		// Override derived metrics using formula and All-sample inputs
+		const derivedBuckets = allBuckets;
+		const profitSeries = [];
+		const marginSeries = [];
+		const roiSeries = [];
+		const cogsSeries = [];
+		for (const b of derivedBuckets) {
+			const avgP = avgPriceByBucket[b]?.value;
+			if (typeof avgP !== 'number') continue;
+			const referral = referralByBucket[b]?.value || 0;
+			const cppVal = cppOverall;
+			const fee = (referral || 0) + (fbaFeeOverall || 0);
+			const profitTarget = 0.2 * avgP;
+			const cogs = avgP - (cppVal + fee + profitTarget);
+			const profit = avgP - (cppVal + fee + cogs);
+			const margin = avgP > 0 ? (profit / avgP) * 100 : 0;
+			const roi = cogs > 0 ? (profit / cogs) * 100 : 0;
+			cogsSeries.push({ bucket: b, value: cogs });
+			profitSeries.push({ bucket: b, value: profit });
+			marginSeries.push({ bucket: b, value: margin });
+			roiSeries.push({ bucket: b, value: roi });
+		}
+		const injectDerived = (key, unit, series) => {
+			timeSeriesData[key] = {
+				metric: key,
+				unit,
+				timeSeries: series,
+			};
+		};
+		injectDerived('cogs_cap', 'usd', cogsSeries);
+		injectDerived('profit', 'usd', profitSeries);
+		injectDerived('margin', 'pct', marginSeries);
+		injectDerived('roi', 'pct', roiSeries);
 
 		// Build comprehensive response
 		const response = {
@@ -2116,6 +2636,14 @@ router.get('/research/category/:id', async (req, res) => {
 				referralFeePercentDefault:
 					category.referralFeePercentDefault ?? null,
 				referralMinFeeUsd: category.referralMinFeeUsd ?? null,
+				// Ads metrics defaults
+				defaultCtr: category.defaultCtr ?? null,
+				defaultCpc: category.defaultCpc ?? null,
+				defaultRoas: category.defaultRoas ?? null,
+				defaultCr: category.defaultCr ?? null,
+				defaultAcos: category.defaultAcos ?? null,
+				defaultTacos: category.defaultTacos ?? null,
+				defaultCpp: category.defaultCpp ?? null,
 			},
 			datasets: datasets.map((dataset) => ({
 				id: dataset._id,
