@@ -1,0 +1,1768 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Category Manager</title>
+		<link rel="stylesheet" href="/dashboard/dashboard.css" />
+	</head>
+	<body>
+		<style>
+			.page-wrap {
+				max-width: 980px;
+				margin: 0 auto;
+			}
+			.header {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				margin-bottom: 16px;
+			}
+			.card {
+				background: #fff;
+				border: 1px solid #e6e6e6;
+				border-radius: 10px;
+				padding: 16px;
+				box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+			}
+			.card + .card {
+				margin-top: 16px;
+			}
+			.form-row {
+				display: flex;
+				gap: 12px;
+				flex-wrap: wrap;
+				align-items: flex-end;
+			}
+			.form-row label {
+				display: block;
+				font-size: 0.85rem;
+				color: #666;
+				margin-bottom: 6px;
+			}
+			.form-row input,
+			.form-row select {
+				padding: 8px 10px;
+				border: 1px solid #dcdcdc;
+				border-radius: 8px;
+				min-width: 220px;
+			}
+			.btn-primary {
+				background: #ef6c00;
+				color: #fff;
+				border: none;
+				border-radius: 8px;
+				padding: 10px 14px;
+				cursor: pointer;
+			}
+			.btn-primary:hover {
+				background: #e36200;
+			}
+			table.cat-table {
+				width: 100%;
+				border-collapse: separate;
+				border-spacing: 0;
+				margin-top: 8px;
+			}
+			table.cat-table th,
+			table.cat-table td {
+				text-align: left;
+				padding: 10px 12px;
+				border-bottom: 1px solid #f0f0f0;
+			}
+			table.cat-table tr:hover {
+				background: #fafafa;
+			}
+			.pill {
+				display: inline-block;
+				padding: 4px 8px;
+				border-radius: 999px;
+				background: #f3f4f6;
+				margin: 4px 6px 0 0;
+				font-size: 0.85rem;
+			}
+			.muted {
+				color: #777;
+				font-size: 0.9rem;
+			}
+			.hint {
+				font-size: 0.85rem;
+				color: #888;
+				margin-top: 6px;
+			}
+		</style>
+
+		<div class="container page-wrap" style="padding: 16px">
+			<div class="header">
+				<h2 style="margin: 0">Category Manager</h2>
+				<a href="insight.html" class="muted"
+					>← Back to Insight Dashboard</a
+				>
+			</div>
+
+			<!-- Stepper -->
+			<div class="card" style="padding: 12px 16px">
+				<div
+					style="
+						display: flex;
+						gap: 16px;
+						align-items: center;
+						flex-wrap: wrap;
+					"
+				>
+					<div style="display: flex; align-items: center; gap: 8px">
+						<div
+							style="
+								width: 24px;
+								height: 24px;
+								border-radius: 50%;
+								background: #ef6c00;
+								color: #fff;
+								display: flex;
+								align-items: center;
+								justify-content: center;
+								font-weight: 600;
+							"
+						>
+							1
+						</div>
+						<div><strong>Create Category</strong></div>
+					</div>
+					<div class="muted">→</div>
+					<div style="display: flex; align-items: center; gap: 8px">
+						<div
+							style="
+								width: 24px;
+								height: 24px;
+								border-radius: 50%;
+								background: #ef6c00;
+								color: #fff;
+								display: flex;
+								align-items: center;
+								justify-content: center;
+								font-weight: 600;
+							"
+						>
+							2
+						</div>
+						<div><strong>Upload Excel</strong></div>
+					</div>
+					<div class="muted">→</div>
+					<div style="display: flex; align-items: center; gap: 8px">
+						<div
+							style="
+								width: 24px;
+								height: 24px;
+								border-radius: 50%;
+								background: #ef6c00;
+								color: #fff;
+								display: flex;
+								align-items: center;
+								justify-content: center;
+								font-weight: 600;
+							"
+						>
+							3
+						</div>
+						<div><strong>Select & Process Sheet</strong></div>
+					</div>
+				</div>
+			</div>
+
+			<div class="card">
+				<h3 style="margin-top: 0">Create Category</h3>
+				<div class="form-row">
+					<input
+						id="catName"
+						type="text"
+						placeholder="Category name..."
+					/>
+					<button class="btn-primary" onclick="createCategory()">
+						Create
+					</button>
+				</div>
+				<div class="hint">Slug auto-generated from name</div>
+			</div>
+
+			<div class="card">
+				<h3 style="margin-top: 0">Categories & Datasets</h3>
+				<div id="catList"></div>
+				<input
+					id="rowUploadFile"
+					type="file"
+					accept=".xlsx,.xls"
+					multiple
+					style="display: none"
+				/>
+				<div
+					id="datasetList"
+					class="hint"
+					style="margin-top: 10px"
+				></div>
+			</div>
+		</div>
+
+		<!-- Sheet Selection Modal -->
+		<div
+			id="sheetModal"
+			style="
+				display: none;
+				position: fixed;
+				top: 0;
+				left: 0;
+				width: 100%;
+				height: 100%;
+				background: rgba(0, 0, 0, 0.5);
+				z-index: 1000;
+			"
+		>
+			<div
+				style="
+					position: absolute;
+					top: 50%;
+					left: 50%;
+					transform: translate(-50%, -50%);
+					background: white;
+					border-radius: 8px;
+					padding: 20px;
+					max-width: 90%;
+					max-height: 90%;
+					overflow: auto;
+				"
+			>
+				<div
+					style="
+						display: flex;
+						justify-content: space-between;
+						align-items: center;
+						margin-bottom: 16px;
+					"
+				>
+					<h3 style="margin: 0">Select Sheet</h3>
+					<button
+						onclick="closeSheetModal()"
+						style="
+							background: none;
+							border: none;
+							font-size: 24px;
+							cursor: pointer;
+						"
+					>
+						&times;
+					</button>
+				</div>
+				<div id="sheetList"></div>
+				<div id="sheetPreview" style="margin-top: 16px"></div>
+			</div>
+		</div>
+
+		<!-- Results Modal -->
+		<div
+			id="resultsModal"
+			style="
+				display: none;
+				position: fixed;
+				top: 0;
+				left: 0;
+				width: 100%;
+				height: 100%;
+				background: rgba(0, 0, 0, 0.5);
+				z-index: 1001;
+			"
+		>
+			<div
+				style="
+					position: absolute;
+					top: 50%;
+					left: 50%;
+					transform: translate(-50%, -50%);
+					background: white;
+					border-radius: 8px;
+					padding: 20px;
+					max-width: 90%;
+					max-height: 90%;
+					overflow: auto;
+					min-width: 500px;
+				"
+			>
+				<div
+					style="
+						display: flex;
+						justify-content: space-between;
+						align-items: center;
+						margin-bottom: 16px;
+					"
+				>
+					<h3 style="margin: 0; color: #4caf50">
+						Processing Results
+					</h3>
+					<button
+						onclick="closeResultsModal()"
+						style="
+							background: none;
+							border: none;
+							font-size: 24px;
+							cursor: pointer;
+						"
+					>
+						&times;
+					</button>
+				</div>
+				<div id="resultsContent"></div>
+			</div>
+		</div>
+
+		<script>
+			async function fetchCategories() {
+				const r = await fetch('/api/research/categories');
+				return r.ok ? await r.json() : [];
+			}
+
+			function renderCategoryList(items) {
+				const el = document.getElementById('catList');
+				if (!items.length) {
+					el.innerHTML = '<p class="muted">No categories yet.</p>';
+					return;
+				}
+				const rows = items
+					.map(
+						(c, i) =>
+							`<tr>
+								<td>${i + 1}</td>
+								<td>${c.name}</td>
+								<td><code>${c.slug}</code></td>
+								<td>
+									<button class="btn-primary" style="padding:6px 10px;font-size:0.8rem;margin-right:6px" onclick="triggerRowUpload('${
+										c.slug
+									}')">Upload Excel</button>
+									<button style="background:#555;color:#fff;border:none;padding:6px 10px;border-radius:8px;font-size:0.8rem" onclick="loadDatasets('${
+										c.slug
+									}')">View Datasets</button>
+								</td>
+							</tr>`
+					)
+					.join('');
+				el.innerHTML = `<table class="cat-table"><thead><tr><th>#</th><th>Name</th><th>Slug</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`;
+				// legacy select removed; datasets are loaded via row action
+			}
+
+			async function refresh() {
+				const items = await fetchCategories();
+				renderCategoryList(items);
+				if (items.length) {
+					await loadDatasets(items[0].slug);
+				}
+			}
+
+			async function loadDatasets(slug) {
+				try {
+					currentCategorySlug = slug;
+					const r = await fetch(
+						`/api/research/datasets?categorySlug=${encodeURIComponent(
+							slug
+						)}`
+					);
+					const data = r.ok ? await r.json() : null;
+					const el = document.getElementById('datasetList');
+					if (!data || !data.datasets || !data.datasets.length) {
+						el.innerHTML =
+							'<p class="muted">No datasets yet for this category.</p>';
+						return;
+					}
+					const rows = data.datasets
+						.map(
+							(d, i) => `
+								<tr>
+									<td>${i + 1}</td>
+									<td>${
+										d.originalFilename.length > 40
+											? d.originalFilename.substring(
+													0,
+													40
+											  ) + '...'
+											: d.originalFilename
+									}</td>
+									<td>${new Date(d.createdAt).toLocaleString()}</td>
+									<td>${d.status}</td>
+									<td>${d.sheetCount}</td>
+									<td>
+										<button class="btn-primary" onclick="selectSheet('${d.id}', '${
+								d.originalFilename
+							}')", style="padding: 4px 8px; font-size: 0.8rem;">
+											View
+										</button>
+										<button onclick="deleteDataset('${
+											d.id
+										}')" style="background:#c62828;color:#fff;border:none;padding:4px 8px;border-radius:8px;font-size:0.8rem;margin-left:6px">Delete</button>
+									</td>
+								</tr>`
+						)
+						.join('');
+					el.innerHTML = `<table class="cat-table"><thead><tr><th>#</th><th>Filename</th><th>Uploaded</th><th>Status</th><th>Sheets</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table>`;
+					// Add compute COGS action
+					const cta = document.createElement('div');
+					cta.style.marginTop = '10px';
+					cta.innerHTML = `
+						<button class="btn-primary" style="padding:6px 10px;font-size:0.85rem;margin-right:8px" onclick="computeCogs()">Compute COGS cap</button>
+						<button style="background:#ff9800;color:#fff;border:none;padding:6px 10px;border-radius:8px;font-size:0.85rem" onclick="migrateBuckets()">Fix Bucket Format</button>
+					`;
+					el.appendChild(cta);
+				} catch (e) {
+					document.getElementById('datasetList').innerHTML =
+						'<p class="muted">Failed to load datasets.</p>';
+				}
+			}
+
+			async function createCategory() {
+				const name = document.getElementById('catName').value.trim();
+				if (!name) {
+					alert('Name required');
+					return;
+				}
+				const r = await fetch('/api/research/categories', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ name }),
+				});
+				if (!r.ok) {
+					const e = await r.json();
+					alert('Create failed: ' + (e.error || r.status));
+					return;
+				}
+				document.getElementById('catName').value = '';
+				refresh();
+			}
+
+			// Sheet selection functions
+			let currentDatasetId = null;
+			let currentFilename = '';
+			let uploadSlugFromRow = null;
+			let currentCategorySlug = null;
+			let currentSheetName = '';
+
+			document
+				.getElementById('rowUploadFile')
+				.addEventListener('change', async (e) => {
+					if (!uploadSlugFromRow) return;
+					const files = Array.from(e.target.files || []);
+					if (!files.length) return;
+					let success = 0;
+					for (const file of files) {
+						try {
+							await uploadExcel(uploadSlugFromRow, file);
+							success++;
+						} catch (err) {
+							console.warn('Upload failed for', file?.name, err);
+						}
+					}
+					if (success && success > 1) {
+						try {
+							await loadDatasets(uploadSlugFromRow);
+						} catch {}
+					}
+					uploadSlugFromRow = null;
+					e.target.value = '';
+				});
+
+			function triggerRowUpload(slug) {
+				uploadSlugFromRow = slug;
+				document.getElementById('rowUploadFile').click();
+			}
+
+			async function uploadExcel(forcedSlug, forcedFile) {
+				const slug = forcedSlug; // row-based upload only
+				const file = forcedFile;
+				if (!file) {
+					alert('Choose a file');
+					return;
+				}
+				const form = new FormData();
+				form.append('file', file);
+				form.append('categorySlug', slug);
+				form.append('categoryName', slug);
+				const r = await fetch('/api/research/upload', {
+					method: 'POST',
+					body: form,
+				});
+				if (!r.ok) {
+					const e = await r.json();
+					alert('Upload failed: ' + (e.error || r.status));
+					return;
+				}
+				const data = await r.json();
+				const chips = data.sheets
+					.map((s) => `<span class="pill">${s}</span>`)
+					.join('');
+				document.getElementById(
+					'sheetInfo'
+				).innerHTML = `<div>UploadId: <code>${data.uploadId}</code></div><div style="margin-top:6px">Sheets: ${chips}</div>`;
+				// auto-refresh datasets for this slug
+				await loadDatasets(slug);
+
+				// Auto-ingest standard sheets for this uploaded file
+				try {
+					await autoIngestStandardSheets(slug, file.name);
+				} catch (err) {
+					console.warn('Auto-ingest skipped:', err?.message || err);
+				}
+			}
+
+			// Auto-ingest helper: process common sheets right after upload
+			async function autoIngestStandardSheets(categorySlug, filename) {
+				if (!categorySlug || !filename) return;
+				// 1) Find dataset by filename
+				const r = await fetch(
+					`/api/research/datasets?categorySlug=${encodeURIComponent(
+						categorySlug
+					)}`
+				);
+				if (!r.ok) return;
+				const js = await r.json();
+				const datasets = Array.isArray(js?.datasets) ? js.datasets : [];
+				if (!datasets.length) return;
+				const match = datasets.find(
+					(d) =>
+						String(d.originalFilename || '').toLowerCase() ===
+						String(filename || '').toLowerCase()
+				);
+				const datasetId = match?.id || match?._id;
+				if (!datasetId) return;
+
+				// 2) Discover available sheets (with short polling to wait parser)
+				let available = [];
+				for (let attempt = 0; attempt < 8; attempt++) {
+					const sres = await fetch(
+						`/api/research/select-sheet?datasetId=${encodeURIComponent(
+							datasetId
+						)}`
+					);
+					if (sres.ok) {
+						const sheetsJs = await sres.json();
+						available = (sheetsJs?.sheets || []).map((s) => s.name);
+						if (available.length) break;
+					}
+					await new Promise((res) => setTimeout(res, 750));
+				}
+				// available might be empty for some files; we'll still attempt fuzzy ingest below
+
+				// 3) Standard sheets to ingest automatically
+				const STANDARD_SHEETS = [
+					'Market Analysis',
+					'Listing Concentration',
+					'Fulfillment',
+					'Origin of Seller',
+					'Publication Time',
+				];
+
+				// 4) Build tasks based on presence (case-insensitive)
+				const toProcess = [];
+				for (const std of STANDARD_SHEETS) {
+					let found = available.find(
+						(n) =>
+							String(n).toLowerCase() ===
+							String(std).toLowerCase()
+					);
+					if (!found) {
+						found = available.find((n) =>
+							String(n)
+								.toLowerCase()
+								.includes(String(std).toLowerCase())
+						);
+					}
+					toProcess.push(found || std);
+				}
+				// Also try Market-research sheet if present
+				const mrSheet = available.find((n) =>
+					String(n).toLowerCase().includes('market-research')
+				);
+				if (mrSheet && !toProcess.includes(mrSheet))
+					toProcess.push(mrSheet);
+				// Always attempt; backend may fuzzy-match sheetName
+
+				// 5) Ingest sequentially to keep server load mild
+				for (const sheetName of toProcess) {
+					try {
+						const ir = await fetch('/api/research/ingest', {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({
+								datasetId,
+								sheetName,
+								ingest: true,
+							}),
+						});
+						if (!ir.ok) {
+							const e = await ir.json().catch(() => ({}));
+							console.warn('Auto-ingest failed:', sheetName, e);
+							continue;
+						}
+					} catch (e) {
+						console.warn('Auto-ingest error:', sheetName, e);
+					}
+				}
+
+				// 6) Refresh UI once done
+				await loadDatasets(categorySlug);
+			}
+
+			async function selectSheet(datasetId, filename) {
+				currentDatasetId = datasetId;
+				currentFilename = filename;
+				document.getElementById('sheetModal').style.display = 'block';
+
+				try {
+					const r = await fetch(
+						`/api/research/select-sheet?datasetId=${datasetId}`
+					);
+					if (!r.ok) {
+						alert('Failed to load sheets');
+						return;
+					}
+					const data = await r.json();
+					renderSheetList(data.sheets);
+				} catch (e) {
+					alert('Error loading sheets: ' + e.message);
+				}
+			}
+
+			function renderSheetList(sheets) {
+				const el = document.getElementById('sheetList');
+				if (!sheets || !sheets.length) {
+					el.innerHTML = '<p class="muted">No sheets found</p>';
+					return;
+				}
+
+				const SUPPORTED = [
+					'Market Analysis',
+					'Listing Concentration',
+					'Fulfillment',
+					'Origin of Seller',
+					'Publication Time',
+				];
+
+				const sheetButtons = sheets
+					.map((sheet) => {
+						const isSupported =
+							SUPPORTED.includes(sheet.name) ||
+							String(sheet.name)
+								.toLowerCase()
+								.includes('market-research');
+						const note = isSupported
+							? ''
+							: ' <span class="muted" style="font-weight:500">(Chưa xử lý)</span>';
+						return `<button class="btn-primary" onclick="previewSheet('${sheet.name}')" style="margin: 4px 8px 4px 0; padding: 8px 12px;">${sheet.name} (${sheet.rows} rows)${note}</button>`;
+					})
+					.join('');
+
+				el.innerHTML = `<div><strong>Available Sheets:</strong></div><div style="margin-top: 8px;">${sheetButtons}</div>`;
+			}
+
+			async function previewSheet(sheetName) {
+				try {
+					const r = await fetch('/api/research/ingest', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							datasetId: currentDatasetId,
+							sheetName: sheetName,
+						}),
+					});
+
+					if (!r.ok) {
+						const error = await r.json();
+						alert(
+							'Preview failed: ' +
+								(error.error || 'Unknown error')
+						);
+						return;
+					}
+
+					const data = await r.json();
+
+					currentSheetName = sheetName;
+					// Special handling for Market Analysis and Fulfillment sheets
+					if (sheetName === 'Market Analysis') {
+						renderMarketAnalysisPreview(data);
+					} else if (sheetName === 'Fulfillment') {
+						renderFulfillmentPreview(data);
+					} else if (sheetName === 'Publication Time') {
+						renderPublicationTimePreview(data);
+					} else if (sheetName === 'Origin of Seller') {
+						renderOriginOfSellerPreview(data);
+					} else if (sheetName === 'Listing Concentration') {
+						renderListingConcentrationPreview(data);
+					} else if (
+						sheetName.toLowerCase().includes('market-research')
+					) {
+						renderMarketResearchPreview(data);
+					} else {
+						renderUnsupportedPreview(sheetName);
+					}
+				} catch (e) {
+					alert('Error previewing sheet: ' + e.message);
+				}
+			}
+
+			function renderUnsupportedPreview(sheetName) {
+				const el = document.getElementById('sheetPreview');
+				el.innerHTML = `
+					<div style="border: 1px solid #ddd; border-radius: 4px; padding: 12px; background: #f9f9f9;">
+						<h4>Sheet: ${sheetName}</h4>
+						<p class="muted" style="margin-top:8px">Chưa xử lý</p>
+						<div style="margin-top: 16px;">
+							<button onclick="closeSheetModal()" style="background: #666; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer;">Close</button>
+						</div>
+					</div>
+				`;
+			}
+
+			function renderMarketAnalysisPreview(data) {
+				const el = document.getElementById('sheetPreview');
+				el.innerHTML = `
+					<div style="border: 1px solid #ddd; border-radius: 4px; padding: 12px; background: #f9f9f9;">
+						<h4>Market Analysis Sheet</h4>
+						<p><strong>Rows:</strong> ${data.rows}</p>
+						<p><strong>Columns:</strong> ${data.columns.join(', ')}</p>
+
+						<div style="margin-top: 16px; padding: 12px; background: #e8f5e8; border-radius: 4px; border-left: 4px solid #4caf50;">
+							<h5 style="margin: 0 0 8px 0; color: #2e7d32;">Auto-Processing Configuration</h5>
+							<p style="margin: 4px 0;"><strong>Metrics:</strong> Sales (units) + Revenue ($) + Avg. Price($) + Avg. Ratings + Avg. Rating + Referral Fee ($)</p>
+							<p style="margin: 4px 0;"><strong>Sales Formula:</strong> Avg. Monthly Unit Sales × Sample Size</p>
+							<p style="margin: 4px 0;"><strong>Revenue Formula:</strong> Avg. Monthly Revenue($) × 100</p>
+							<p style="margin: 4px 0;"><strong>Avg. Price Formula:</strong> Avg. Price($)</p>
+							<p style="margin: 4px 0;"><strong>Avg. Ratings Formula:</strong> Avg. Ratings</p>
+							<p style="margin: 4px 0;"><strong>Avg. Rating Formula:</strong> Avg. Rating</p>
+							<p style="margin: 4px 0;"><strong>Referral Fee Formula:</strong> Avg. Price × Fee% (matched from referral fee rules by category)</p>
+							<p style="margin: 4px 0;"><strong>Sample Size:</strong> Read from "Sample Size" column</p>
+						</div>
+
+						<div style="margin-top: 16px;">
+							<button class="btn-primary" onclick="ingestMarketAnalysis()">
+								Process Market Analysis Sheet
+							</button>
+							<button onclick="closeSheetModal()" style="margin-left: 8px; background: #666; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer;">
+								Cancel
+							</button>
+						</div>
+					</div>
+				`;
+			}
+
+			function renderSheetPreview(data) {
+				const el = document.getElementById('sheetPreview');
+				el.innerHTML = `
+					<div style="border: 1px solid #ddd; border-radius: 4px; padding: 12px; background: #f9f9f9;">
+						<h4>Sheet Preview: ${data.sheetName}</h4>
+						<p><strong>Rows:</strong> ${data.rows}</p>
+						<p><strong>Columns:</strong> ${data.columns.join(', ')}</p>
+
+						<div style="margin-top: 16px;">
+							<h5>Configure Data Mapping:</h5>
+
+							<div style="margin-bottom: 12px;">
+								<label><strong>Time Column:</strong></label>
+								<select id="bucketColumn" style="margin-left: 8px; padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px;">
+									<option value="">Select time column...</option>
+									${data.columns.map((col) => `<option value="${col}">${col}</option>`).join('')}
+								</select>
+							</div>
+
+							<div style="margin-bottom: 12px;">
+								<label><strong>Time Format:</strong></label>
+								<select id="bucketFormat" style="margin-left: 8px; padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px;">
+									<option value="YYYY-MM">YYYY-MM (2025-01)</option>
+									<option value="YYYYMM">YYYYMM (202501)</option>
+									<option value="MM/YYYY">MM/YYYY (01/2025)</option>
+								</select>
+							</div>
+
+							<div>
+								<label><strong>Metric Mappings:</strong></label>
+								<div id="metricMappings" style="margin-top: 8px; max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 8px; background: white;">
+									${renderMetricMappings(data.columns)}
+								</div>
+							</div>
+
+							<div style="margin-top: 16px;">
+								<button class="btn-primary" onclick="ingestData('${data.sheetName}')">
+									Ingest This Sheet
+								</button>
+								<button onclick="closeSheetModal()" style="margin-left: 8px; background: #666; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer;">
+									Cancel
+								</button>
+							</div>
+						</div>
+					</div>
+				`;
+			}
+
+			function renderMetricMappings(columns) {
+				const predefinedMetrics = [
+					{
+						code: 'sales_units',
+						name: 'Sales (units)',
+						unit: 'units',
+					},
+					{ code: 'revenue', name: 'Revenue ($)', unit: 'usd' },
+					{ code: 'avg_price', name: 'Avg Price ($)', unit: 'usd' },
+					{ code: 'avg_ratings', name: 'Avg Ratings', unit: 'count' },
+					{ code: 'avg_rating', name: 'Avg Rating', unit: 'count' },
+					{ code: 'fulfillment_fba', name: 'FBA %', unit: 'pct' },
+					{ code: 'fulfillment_amz', name: 'AMZ %', unit: 'pct' },
+					{ code: 'fulfillment_fbm', name: 'FBM %', unit: 'pct' },
+					{
+						code: 'new_product_ratio',
+						name: 'New Product %',
+						unit: 'pct',
+					},
+					{
+						code: 'listing_concentration',
+						name: 'Listing Concentration %',
+						unit: 'pct',
+					},
+					{
+						code: 'referral_fee',
+						name: 'Referral Fee ($)',
+						unit: 'usd',
+					},
+					{ code: 'fba_fee', name: 'FBA Fee ($)', unit: 'usd' },
+					{ code: 'ctr', name: 'CTR %', unit: 'pct' },
+					{ code: 'cpc', name: 'CPC ($)', unit: 'usd' },
+					{ code: 'roas', name: 'ROAS', unit: 'units' },
+					{ code: 'cr', name: 'CR %', unit: 'pct' },
+					{ code: 'acos', name: 'ACOS %', unit: 'pct' },
+					{ code: 'tacos', name: 'TACOS %', unit: 'pct' },
+					{ code: 'cpp', name: 'CPP ($)', unit: 'usd' },
+				];
+
+				return predefinedMetrics
+					.map(
+						(metric) => `
+					<div style="display: flex; align-items: center; margin-bottom: 8px; padding: 4px; border-bottom: 1px solid #f0f0f0;">
+						<div style="width: 200px; font-size: 0.9rem;">${metric.name}</div>
+						<select class="metric-column" data-metric="${metric.code}" data-unit="${
+							metric.unit
+						}" style="flex: 1; margin: 0 8px; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
+							<option value="">-- Not mapped --</option>
+							${columns.map((col) => `<option value="${col}">${col}</option>`).join('')}
+						</select>
+					</div>
+				`
+					)
+					.join('');
+			}
+
+			async function ingestData(sheetName) {
+				try {
+					// Collect mapping configuration
+					const bucketColumn =
+						document.getElementById('bucketColumn').value;
+					const bucketFormat =
+						document.getElementById('bucketFormat').value;
+
+					if (!bucketColumn) {
+						alert('Please select a time column');
+						return;
+					}
+
+					// Collect metric mappings
+					const metricMappings = [];
+					const metricSelects =
+						document.querySelectorAll('.metric-column');
+					metricSelects.forEach((select) => {
+						if (select.value) {
+							metricMappings.push({
+								metric: select.dataset.metric,
+								column: select.value,
+								unit: select.dataset.unit,
+							});
+						}
+					});
+
+					if (metricMappings.length === 0) {
+						alert('Please map at least one metric to a column');
+						return;
+					}
+
+					console.log('Ingesting with config:', {
+						bucketColumn,
+						bucketFormat,
+						metricMappings,
+					});
+
+					const r = await fetch('/api/research/ingest', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							datasetId: currentDatasetId,
+							sheetName: sheetName,
+							bucketColumn,
+							bucketFormat,
+							metricMappings,
+							ingest: true,
+						}),
+					});
+
+					if (!r.ok) {
+						const error = await r.json();
+						alert(
+							'Ingest failed: ' + (error.error || 'Unknown error')
+						);
+						return;
+					}
+
+					const result = await r.json();
+					alert(
+						`Data ingested successfully! ${result.inserted} records inserted.`
+					);
+					closeSheetModal();
+					refresh();
+				} catch (e) {
+					alert('Error ingesting data: ' + e.message);
+				}
+			}
+
+			async function ingestMarketAnalysis() {
+				try {
+					const r = await fetch('/api/research/ingest', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							datasetId: currentDatasetId,
+							sheetName: 'Market Analysis',
+							ingest: true,
+						}),
+					});
+
+					if (!r.ok) {
+						const error = await r.json();
+						alert(
+							'Processing failed: ' +
+								(error.error || 'Unknown error')
+						);
+						return;
+					}
+
+					const result = await r.json();
+
+					// Show detailed results
+					let resultMessage = `Market Analysis processed successfully!\n\n${result.message}\n\nCalculation: ${result.calculation}\nRecords: ${result.inserted}`;
+
+					if (
+						result.processedData &&
+						result.processedData.length > 0
+					) {
+						resultMessage += '\n\n Processed Data:\n';
+						result.processedData.forEach((item, index) => {
+							resultMessage += `${index + 1}. Time: ${
+								item.time
+							}\n`;
+							resultMessage += `   Original: ${item.originalValue}\n`;
+							resultMessage += `   Calculated: ${item.calculatedValue}\n`;
+							resultMessage += `   Formula: ${item.formula}\n\n`;
+						});
+					}
+
+					showDetailedResults(result);
+					closeSheetModal();
+					refresh();
+				} catch (e) {
+					alert('Error processing Market Analysis: ' + e.message);
+				}
+			}
+
+			function closeSheetModal() {
+				document.getElementById('sheetModal').style.display = 'none';
+				document.getElementById('sheetList').innerHTML = '';
+				document.getElementById('sheetPreview').innerHTML = '';
+			}
+
+			function showDetailedResults(result) {
+				const el = document.getElementById('resultsContent');
+				let html = `
+					<div style="background: #e8f5e8; padding: 12px; border-radius: 4px; margin-bottom: 16px;">
+						<h4 style="margin: 0 0 8px 0; color: #2e7d32;"> ${result.message}</h4>
+						<p style="margin: 4px 0;"><strong>Calculation:</strong> ${result.calculation}</p>
+						<p style="margin: 4px 0;"><strong>Records Processed:</strong> ${result.inserted}</p>
+					</div>
+				`;
+
+				if (result.processedData && result.processedData.length > 0) {
+					html += `
+						<div>
+							<h4 style="margin: 0 0 12px 0;"> Detailed Results:</h4>
+							<div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px;">
+								<table style="width: 100%; border-collapse: collapse;">
+									<thead>
+										<tr style="background: #f5f5f5;">
+											<th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">#</th>
+											<th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Sample Type</th>
+											<th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Sales (units)</th>
+											<th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Revenue ($)</th>
+											<th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Avg. Price($)</th>
+											<th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Avg. Ratings</th>
+											<th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Avg. Rating</th>
+											<th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Referral Fee ($)</th>
+										</tr>
+									</thead>
+									<tbody>
+					`;
+
+					result.processedData.forEach((item, index) => {
+						const salesInfo = item.sales
+							? `<div style="font-size: 0.9rem;">
+								<div><strong>Value:</strong> ${item.sales.calculatedValue.toLocaleString()}</div>
+								<div style="color: #666; font-size: 0.8rem;">${item.sales.formula}</div>
+							</div>`
+							: 'N/A';
+
+						const revenueInfo = item.revenue
+							? `<div style="font-size: 0.9rem;">
+								<div><strong>Value:</strong> $${item.revenue.calculatedValue.toLocaleString()}</div>
+								<div style="color: #666; font-size: 0.8rem;">${item.revenue.formula}</div>
+							</div>`
+							: 'N/A';
+
+						const avgPriceInfo = item.avgPrice
+							? `<div style="font-size: 0.9rem;">
+								<div><strong>Value:</strong> $${item.avgPrice.calculatedValue.toLocaleString()}</div>
+								<div style="color: #666; font-size: 0.8rem;">${item.avgPrice.formula}</div>
+							</div>`
+							: 'N/A';
+
+						const avgRatingsInfo = item.avgRatings
+							? `<div style="font-size: 0.9rem;">
+								<div><strong>Value:</strong> ${item.avgRatings.calculatedValue.toLocaleString()}</div>
+								<div style="color: #666; font-size: 0.8rem;">${item.avgRatings.formula}</div>
+							</div>`
+							: 'N/A';
+
+						const avgRatingInfo = item.avgRating
+							? `<div style="font-size: 0.9rem;">
+								<div><strong>Value:</strong> ${item.avgRating.calculatedValue.toLocaleString()}</div>
+								<div style="color: #666; font-size: 0.8rem;">${item.avgRating.formula}</div>
+							</div>`
+							: 'N/A';
+
+						const referralFeeInfo = item.referralFee
+							? item.referralFee.message
+								? `<div style="font-size: 0.9rem; color:#8d6e63;">No category rule</div>`
+								: `<div style="font-size: 0.9rem;">
+									<div><strong>Value:</strong> $${item.referralFee.calculatedValue.toLocaleString()}</div>
+									<div style="color: #666; font-size: 0.8rem;">(${
+										item.referralFee.feePercent ?? '—'
+									}% / Avg Price $${(
+										item.referralFee.avgPrice ?? 0
+								  ).toLocaleString()})</div>
+								</div>`
+							: 'N/A';
+
+						html += `
+							<tr>
+								<td style="padding: 8px; border-bottom: 1px solid #eee;">${index + 1}</td>
+								<td style="padding: 8px; border-bottom: 1px solid #eee; color: #ff9800; font-weight: bold;">${
+									item.sampleType || 'N/A'
+								}</td>
+								<td style="padding: 8px; border-bottom: 1px solid #eee; color: #4caf50;">${salesInfo}</td>
+								<td style="padding: 8px; border-bottom: 1px solid #eee; color: #2196f3;">${revenueInfo}</td>
+								<td style="padding: 8px; border-bottom: 1px solid #eee; color: #9c27b0;">${avgPriceInfo}</td>
+								<td style="padding: 8px; border-bottom: 1px solid #eee; color: #e91e63;">${avgRatingsInfo}</td>
+								<td style="padding: 8px; border-bottom: 1px solid #eee; color: #00bcd4;">${avgRatingInfo}</td>
+								<td style="padding: 8px; border-bottom: 1px solid #eee; color: #795548;">${referralFeeInfo}</td>
+							</tr>
+						`;
+					});
+
+					html += `
+									</tbody>
+								</table>
+							</div>
+						</div>
+					`;
+				}
+
+				html += `
+					<div style="margin-top: 16px; text-align: right;">
+						<button onclick="closeResultsModal()" class="btn-primary" style="padding: 8px 16px;">
+							Close
+						</button>
+					</div>
+				`;
+
+				el.innerHTML = html;
+				document.getElementById('resultsModal').style.display = 'block';
+			}
+
+			function closeResultsModal() {
+				document.getElementById('resultsModal').style.display = 'none';
+				document.getElementById('resultsContent').innerHTML = '';
+			}
+
+			function renderFulfillmentPreview(data) {
+				const el = document.getElementById('sheetPreview');
+				el.innerHTML = `
+					<div style="border: 1px solid #ddd; border-radius: 4px; padding: 12px; background: #f9f9f9;">
+						<h4>Fulfillment Sheet</h4>
+						<p><strong>Rows:</strong> ${data.rows}</p>
+						<p><strong>Columns:</strong> ${data.columns.join(', ')}</p>
+
+						<div style="margin-top: 16px; padding: 12px; background: #e3f2fd; border-radius: 4px; border-left: 4px solid #2196f3;">
+							<h5 style="margin: 0 0 8px 0; color: #1565c0;">Auto-Processing Configuration</h5>
+							<p style="margin: 4px 0;"><strong>Extract:</strong> Fulfillment + ASINs Proportion</p>
+							<p style="margin: 4px 0;">Saved as metrics: fulfillment_fba/fbm/amz/na (unit: %), bucket: overall</p>
+						</div>
+
+						<div style="margin-top: 16px;">
+							<button class="btn-primary" onclick="ingestFulfillment()">Process Fulfillment Sheet</button>
+							<button onclick="closeSheetModal()" style="margin-left: 8px; background: #666; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer;">Cancel</button>
+						</div>
+					</div>
+				`;
+			}
+
+			async function ingestFulfillment() {
+				try {
+					const r = await fetch('/api/research/ingest', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							datasetId: currentDatasetId,
+							sheetName: 'Fulfillment',
+							ingest: true,
+						}),
+					});
+					if (!r.ok) {
+						const error = await r.json();
+						alert(
+							'Processing failed: ' +
+								(error.error || 'Unknown error')
+						);
+						return;
+					}
+					const result = await r.json();
+					showFulfillmentResults(result);
+					closeSheetModal();
+					refresh();
+				} catch (e) {
+					alert('Error processing Fulfillment: ' + e.message);
+				}
+			}
+
+			function showFulfillmentResults(result) {
+				const el = document.getElementById('resultsContent');
+				let html = `
+					<div style="background: #e3f2fd; padding: 12px; border-radius: 4px; margin-bottom: 16px;">
+						<h4 style="margin: 0 0 8px 0; color: #1565c0;"> ${result.message}</h4>
+						<p style="margin: 4px 0;"><strong>Records Processed:</strong> ${result.inserted}</p>
+					</div>
+				`;
+
+				const mapLabel = {
+					fulfillment_fba: 'FBA',
+					fulfillment_fbm: 'FBM',
+					fulfillment_amz: 'AMZ',
+					fulfillment_na: 'NA',
+				};
+
+				if (result.processedData && result.processedData.length > 0) {
+					html += `
+						<div>
+							<h4 style="margin: 0 0 12px 0;"> Fulfillment Breakdown:</h4>
+							<div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px;">
+								<table style="width: 100%; border-collapse: collapse;">
+									<thead>
+										<tr style="background: #f5f5f5;">
+											<th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">#</th>
+											<th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Fulfillment</th>
+											<th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">ASINs Proportion</th>
+										</tr>
+									</thead>
+									<tbody>
+						`;
+
+					result.processedData.forEach((item, index) => {
+						const label = mapLabel[item.metric] || item.metric;
+						html += `
+							<tr>
+								<td style="padding: 8px; border-bottom: 1px solid #eee;">${index + 1}</td>
+								<td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: 600;">${label}</td>
+								<td style="padding: 8px; border-bottom: 1px solid #eee; color: #1565c0;">${Number(
+									item.value
+								).toLocaleString()}%</td>
+							</tr>
+						`;
+					});
+
+					html += `
+									</tbody>
+								</table>
+							</div>
+						</div>
+					`;
+				}
+
+				html += `
+					<div style="margin-top: 16px; text-align: right;">
+						<button onclick="closeResultsModal()" class="btn-primary" style="padding: 8px 16px;">Close</button>
+					</div>
+				`;
+
+				el.innerHTML = html;
+				document.getElementById('resultsModal').style.display = 'block';
+			}
+
+			function renderPublicationTimePreview(data) {
+				const el = document.getElementById('sheetPreview');
+				el.innerHTML = `
+					<div style="border: 1px solid #ddd; border-radius: 4px; padding: 12px; background: #f9f9f9;">
+						<h4>Publication Time Sheet</h4>
+						<p><strong>Rows:</strong> ${data.rows}</p>
+						<p><strong>Columns:</strong> ${data.columns.join(', ')}</p>
+
+						<div style="margin-top: 16px; padding: 12px; background: #fff3e0; border-radius: 4px; border-left: 4px solid #ff9800;">
+							<h5 style="margin: 0 0 8px 0; color: #e65100;">Auto-Processing Configuration</h5>
+							<p style="margin: 4px 0;">Compute <strong>New product ratio (%)</strong> by summing Sales Proportion for recent publication buckets (months and up to ~1 year).</p>
+							<p style="margin: 4px 0;">Stored as metric: <code>new_product_ratio</code> (unit: %), bucket: overall</p>
+						</div>
+
+						<div style="margin-top: 16px;">
+							<button class="btn-primary" onclick="ingestPublicationTime()">Process Publication Time Sheet</button>
+							<button onclick="closeSheetModal()" style="margin-left: 8px; background: #666; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer;">Cancel</button>
+						</div>
+					</div>
+				`;
+			}
+
+			async function ingestPublicationTime() {
+				try {
+					const r = await fetch('/api/research/ingest', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							datasetId: currentDatasetId,
+							sheetName: 'Publication Time',
+							ingest: true,
+						}),
+					});
+					if (!r.ok) {
+						const error = await r.json();
+						alert(
+							'Processing failed: ' +
+								(error.error || 'Unknown error')
+						);
+						return;
+					}
+					const result = await r.json();
+					showPublicationTimeResults(result);
+					closeSheetModal();
+					refresh();
+				} catch (e) {
+					alert('Error processing Publication Time: ' + e.message);
+				}
+			}
+
+			function showPublicationTimeResults(result) {
+				const el = document.getElementById('resultsContent');
+				let html = `
+					<div style="background: #fff3e0; padding: 12px; border-radius: 4px; margin-bottom: 16px;">
+						<h4 style="margin: 0 0 8px 0; color: #e65100;"> ${result.message}</h4>
+						<p style="margin: 4px 0;"><strong>New product ratio:</strong> ${Number(
+							result.processedData?.[0]?.value || 0
+						).toFixed(2)}%</p>
+					</div>`;
+
+				if (Array.isArray(result.details) && result.details.length) {
+					html += `
+						<div>
+							<h4 style="margin: 0 0 12px 0;"> Publication Time Details:</h4>
+							<div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px;">
+								<table style="width: 100%; border-collapse: collapse;">
+									<thead>
+										<tr style="background: #f5f5f5;">
+											<th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">#</th>
+											<th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Publication Time</th>
+											<th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Sales Proportion</th>
+											<th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Counted as New?</th>
+										</tr>
+									</thead>
+									<tbody>`;
+
+					result.details.forEach((row, idx) => {
+						html += `
+							<tr>
+								<td style="padding: 8px; border-bottom: 1px solid #eee;">${idx + 1}</td>
+								<td style="padding: 8px; border-bottom: 1px solid #eee;">${
+									row.publicationTime
+								}</td>
+								<td style="padding: 8px; border-bottom: 1px solid #eee; color:#e65100;">${Number(
+									row.salesProportion
+								).toFixed(2)}%</td>
+								<td style="padding: 8px; border-bottom: 1px solid #eee;">${
+									row.isNew
+										? '<span class="pill" style="background:#fff3e0;color:#e65100">Yes</span>'
+										: 'No'
+								}</td>
+							</tr>`;
+					});
+
+					html += `
+								</tbody>
+							</table>
+						</div>
+					</div>`;
+				}
+
+				html += `
+					<div style="margin-top: 16px; text-align: right;">
+						<button onclick="closeResultsModal()" class="btn-primary" style="padding: 8px 16px;">Close</button>
+					</div>`;
+
+				el.innerHTML = html;
+				document.getElementById('resultsModal').style.display = 'block';
+			}
+
+			function renderOriginOfSellerPreview(data) {
+				const el = document.getElementById('sheetPreview');
+				el.innerHTML = `
+					<div style="border: 1px solid #ddd; border-radius: 4px; padding: 12px; background: #f9f9f9;">
+						<h4>Origin of Seller Sheet</h4>
+						<p><strong>Rows:</strong> ${data.rows}</p>
+						<p><strong>Columns:</strong> ${data.columns.join(', ')}</p>
+
+						<div style="margin-top: 16px; padding: 12px; background: #e8f5e9; border-radius: 4px; border-left: 4px solid #4caf50;">
+							<h5 style="margin: 0 0 8px 0; color: #2e7d32;">Auto-Processing Configuration</h5>
+							<p style="margin: 4px 0;">Extract <strong>Origin of Seller</strong> and <strong>Sales Proportion</strong>.</p>
+							<p style="margin: 4px 0;">Stored as metrics: <code>seller_origin_*</code> (unit: %), bucket: overall</p>
+						</div>
+
+						<div style="margin-top: 16px;">
+							<button class="btn-primary" onclick="ingestOriginOfSeller()">Process Origin of Seller Sheet</button>
+							<button onclick="closeSheetModal()" style="margin-left: 8px; background: #666; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer;">Cancel</button>
+						</div>
+					</div>
+				`;
+			}
+
+			async function ingestOriginOfSeller() {
+				try {
+					const r = await fetch('/api/research/ingest', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							datasetId: currentDatasetId,
+							sheetName: 'Origin of Seller',
+							ingest: true,
+						}),
+					});
+					if (!r.ok) {
+						const error = await r.json();
+						alert(
+							'Processing failed: ' +
+								(error.error || 'Unknown error')
+						);
+						return;
+					}
+					const result = await r.json();
+					showOriginOfSellerResults(result);
+					closeSheetModal();
+					refresh();
+				} catch (e) {
+					alert('Error processing Origin of Seller: ' + e.message);
+				}
+			}
+
+			function showOriginOfSellerResults(result) {
+				const el = document.getElementById('resultsContent');
+				let html = `
+					<div style="background: #e8f5e9; padding: 12px; border-radius: 4px; margin-bottom: 16px;">
+						<h4 style="margin: 0 0 8px 0; color: #2e7d32;"> ${result.message}</h4>
+						<p style="margin: 4px 0;"><strong>Records Processed:</strong> ${result.inserted}</p>
+					</div>`;
+
+				if (Array.isArray(result.details) && result.details.length) {
+					html += `
+						<div>
+							<h4 style="margin: 0 0 12px 0;"> Origin of Seller Details:</h4>
+							<div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px;">
+								<table style="width: 100%; border-collapse: collapse;">
+									<thead>
+										<tr style="background: #f5f5f5;">
+											<th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">#</th>
+											<th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Origin of Seller</th>
+											<th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Sales Proportion</th>
+										</tr>
+									</thead>
+									<tbody>`;
+
+					result.details.forEach((row, idx) => {
+						html += `
+							<tr>
+								<td style="padding: 8px; border-bottom: 1px solid #eee;">${idx + 1}</td>
+								<td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: 600;">${
+									row.origin
+								}</td>
+								<td style="padding: 8px; border-bottom: 1px solid #eee; color:#2e7d32;">${Number(
+									row.salesProportion
+								).toFixed(2)}%</td>
+							</tr>`;
+					});
+
+					html += `
+								</tbody>
+							</table>
+						</div>
+					</div>`;
+				}
+
+				html += `
+					<div style="margin-top: 16px; text-align: right;">
+						<button onclick="closeResultsModal()" class="btn-primary" style="padding: 8px 16px;">Close</button>
+					</div>`;
+
+				el.innerHTML = html;
+				document.getElementById('resultsModal').style.display = 'block';
+			}
+
+			function renderListingConcentrationPreview(data) {
+				const el = document.getElementById('sheetPreview');
+				el.innerHTML = `
+					<div style="border: 1px solid #ddd; border-radius: 4px; padding: 12px; background: #f9f9f9;">
+						<h4>Listing Concentration Sheet</h4>
+						<p><strong>Rows:</strong> ${data.rows}</p>
+						<p><strong>Columns:</strong> ${data.columns.join(', ')}</p>
+
+						<div style="margin-top: 16px; padding: 12px; background: #f3e5f5; border-radius: 4px; border-left: 4px solid #9c27b0;">
+							<h5 style="margin: 0 0 8px 0; color: #6a1b9a;">Auto-Processing Configuration</h5>
+							<p style="margin: 4px 0;">Sum <strong>Sales Proportion</strong> for rows with <strong>Ranking</strong> from 1 to 10.</p>
+							<p style="margin: 4px 0;">Stored as metric: <code>listing_concentration</code> (unit: %), bucket: top10</p>
+						</div>
+
+						<div style="margin-top: 16px;">
+							<button class="btn-primary" onclick="ingestListingConcentration()">Process Listing Concentration Sheet</button>
+							<button onclick="closeSheetModal()" style="margin-left: 8px; background: #666; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer;">Cancel</button>
+						</div>
+					</div>
+				`;
+			}
+
+			function renderMarketResearchPreview(data) {
+				const el = document.getElementById('sheetPreview');
+				el.innerHTML = `
+					<div style="border: 1px solid #ddd; border-radius: 4px; padding: 12px; background: #f9f9f9;">
+						<h4>Market-research Sheet</h4>
+						<p><strong>Rows:</strong> ${data.rows}</p>
+						<p><strong>Columns:</strong> ${data.columns.join(', ')}</p>
+
+						<div style="margin-top: 16px; padding: 12px; background: #e0f2f1; border-radius: 4px; border-left: 4px solid #00796b;">
+							<h5 style="margin: 0 0 8px 0; color: #004d40;">Auto-Processing Configuration</h5>
+							<p style="margin: 4px 0;">Extract <strong>Avg.Weight(pounds)</strong> and <strong>Avg.Volume(in³)</strong>.</p>
+							<p style="margin: 4px 0;">Determine <strong>Size Tier</strong> using <code>sizeTierRule</code>, then compute <strong>FBA Fee</strong> using <code>fbaFeeRule</code>.</p>
+						</div>
+
+						<div style="margin-top: 16px;">
+							<button class="btn-primary" onclick="ingestMarketResearch()">Process Market-research Sheet</button>
+							<button onclick="closeSheetModal()" style="margin-left: 8px; background: #666; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer;">Cancel</button>
+						</div>
+					</div>
+				`;
+			}
+
+			async function ingestMarketResearch() {
+				try {
+					if (!currentDatasetId) {
+						alert(
+							'Please open the sheet preview first to set dataset and sheet.'
+						);
+						return;
+					}
+					// Auto-pick sheet containing "market-research" if not set
+					if (!currentSheetName) {
+						try {
+							const resp = await fetch(
+								`/api/research/select-sheet?datasetId=${currentDatasetId}`
+							);
+							if (resp.ok) {
+								const js = await resp.json();
+								const found = (js.sheets || []).find((s) =>
+									String(s.name)
+										.toLowerCase()
+										.includes('market-research')
+								);
+								if (found) currentSheetName = found.name;
+							}
+						} catch (e) {}
+					}
+					if (!currentSheetName) {
+						alert(
+							'Please open the sheet preview first to set dataset and sheet.'
+						);
+						return;
+					}
+					const r = await fetch('/api/research/ingest', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							datasetId: currentDatasetId,
+							sheetName: currentSheetName,
+							ingest: true,
+						}),
+					});
+					if (!r.ok) {
+						const error = await r.json();
+						alert(
+							'Processing failed: ' +
+								(error.error || 'Unknown error')
+						);
+						return;
+					}
+					const result = await r.json();
+					showMarketResearchResults(result);
+					closeSheetModal();
+					refresh();
+				} catch (e) {
+					alert('Error processing Market-research: ' + e.message);
+				}
+			}
+
+			function showMarketResearchResults(result) {
+				const el = document.getElementById('resultsContent');
+				let html = `
+					<div style="background: #e0f2f1; padding: 12px; border-radius: 4px; margin-bottom: 16px;">
+						<h4 style="margin: 0 0 8px 0; color: #00695c;"> ${result.message}</h4>
+						<p style="margin: 4px 0;"><strong>FBA Fee:</strong> $${Number(
+							result.processedData?.[0]?.value || 0
+						).toFixed(2)}</p>
+					</div>`;
+
+				if (
+					Array.isArray(result.processedData) &&
+					result.processedData.length
+				) {
+					const it = result.processedData[0];
+					html += `
+						<div style="border: 1px solid #ddd; border-radius: 4px;">
+							<table style="width: 100%; border-collapse: collapse;">
+								<thead>
+									<tr style="background: #f5f5f5;">
+										<th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Tier</th>
+										<th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Avg.Weight (lb)</th>
+										<th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Avg.Volume (in³)</th>
+										<th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">FBA Fee ($)</th>
+									</tr>
+								</thead>
+								<tbody>
+									<tr>
+										<td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: 600;">${
+											it.tier || '-'
+										}</td>
+										<td style="padding: 8px; border-bottom: 1px solid #eee;">${Number(
+											it.avgWeightLb || 0
+										).toFixed(2)}</td>
+										<td style="padding: 8px; border-bottom: 1px solid #eee;">${Number(
+											it.avgVolumeIn3 || 0
+										).toFixed(2)}</td>
+										<td style="padding: 8px; border-bottom: 1px solid #eee; color:#00695c;">$${Number(
+											it.value || 0
+										).toFixed(2)}</td>
+									</tr>
+								</tbody>
+							</table>
+						</div>`;
+				}
+
+				html += `
+					<div style="margin-top: 16px; text-align: right;">
+						<button onclick="closeResultsModal()" class="btn-primary" style="padding: 8px 16px;">Close</button>
+					</div>`;
+
+				el.innerHTML = html;
+				document.getElementById('resultsModal').style.display = 'block';
+			}
+
+			async function ingestListingConcentration() {
+				try {
+					const r = await fetch('/api/research/ingest', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							datasetId: currentDatasetId,
+							sheetName: 'Listing Concentration',
+							ingest: true,
+						}),
+					});
+					if (!r.ok) {
+						const error = await r.json();
+						alert(
+							'Processing failed: ' +
+								(error.error || 'Unknown error')
+						);
+						return;
+					}
+					const result = await r.json();
+					showListingConcentrationResults(result);
+					closeSheetModal();
+					refresh();
+				} catch (e) {
+					alert(
+						'Error processing Listing Concentration: ' + e.message
+					);
+				}
+			}
+
+			function showListingConcentrationResults(result) {
+				const el = document.getElementById('resultsContent');
+				let html = `
+					<div style=\"background: #f3e5f5; padding: 12px; border-radius: 4px; margin-bottom: 16px;\">
+						<h4 style=\"margin: 0 0 8px 0; color: #6a1b9a;\"> Listing Concentration</h4>
+						<p style=\"margin: 4px 0;\"><strong>Total (Top 10 by Ranking):</strong> ${Number(
+							result.processedData?.[0]?.value || 0
+						).toFixed(2)}%</p>
+					</div>`;
+
+				html += `
+					<div style=\"margin-top: 16px; text-align: right;\">
+						<button onclick=\"closeResultsModal()\" class=\"btn-primary\" style=\"padding: 8px 16px;\">Close</button>
+					</div>`;
+
+				el.innerHTML = html;
+				document.getElementById('resultsModal').style.display = 'block';
+			}
+
+			async function deleteDataset(id) {
+				if (!confirm('Delete this dataset and all related data?'))
+					return;
+				try {
+					const r = await fetch(`/api/research/datasets/${id}`, {
+						method: 'DELETE',
+					});
+					if (!r.ok) {
+						const e = await r.json().catch(() => ({}));
+						alert('Delete failed: ' + (e.error || r.status));
+						return;
+					}
+					await loadDatasets(currentCategorySlug || '');
+				} catch (e) {
+					alert('Error deleting dataset: ' + e.message);
+				}
+			}
+
+			async function computeCogs() {
+				if (!currentDatasetId) {
+					alert('Open a dataset and preview any sheet first.');
+					return;
+				}
+				try {
+					const r = await fetch('/api/research/compute-cogs', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ datasetId: currentDatasetId }),
+					});
+					if (!r.ok) {
+						const e = await r.json();
+						alert(
+							'Compute failed: ' + (e.error || 'Unknown error')
+						);
+						return;
+					}
+					const result = await r.json();
+					showCogsResults(result);
+				} catch (e) {
+					alert('Error computing COGS: ' + e.message);
+				}
+			}
+
+			function showCogsResults(result) {
+				const el = document.getElementById('resultsContent');
+				let html = `
+					<div style="background:#ede7f6;padding:12px;border-radius:4px;margin-bottom:16px;">
+						<h4 style="margin:0 0 8px 0;color:#4527a0;">COGS cap</h4>
+						<p style="margin:4px 0;"><strong>COGS trần:</strong> $${Number(
+							result.processedData?.[0]?.value || 0
+						).toFixed(2)}</p>
+					</div>`;
+				if (result.details) {
+					html += `
+						<table style="width:100%;border-collapse:collapse;border:1px solid #ddd;">
+							<thead><tr style="background:#f5f5f5;"><th style="padding:8px;text-align:left;">Item</th><th style="padding:8px;text-align:left;">Value</th></tr></thead>
+							<tbody>
+								<tr><td style="padding:8px;border-top:1px solid #eee;">Avg. Price</td><td style="padding:8px;border-top:1px solid #eee;">$${Number(
+									result.details.avgPrice || 0
+								).toFixed(2)}</td></tr>
+								<tr><td style="padding:8px;border-top:1px solid #eee;">Ads (20%)</td><td style="padding:8px;border-top:1px solid #eee;">$${Number(
+									result.details.ads || 0
+								).toFixed(2)}</td></tr>
+								<tr><td style="padding:8px;border-top:1px solid #eee;">Referral fee</td><td style="padding:8px;border-top:1px solid #eee;">$${Number(
+									result.details.referralFee || 0
+								).toFixed(2)}</td></tr>
+								<tr><td style="padding:8px;border-top:1px solid #eee;">FBA fee</td><td style="padding:8px;border-top:1px solid #eee;">$${Number(
+									result.details.fbaFee || 0
+								).toFixed(2)}</td></tr>
+								<tr><td style="padding:8px;border-top:1px solid #eee;">Profit mục tiêu (20%)</td><td style="padding:8px;border-top:1px solid #eee;">$${Number(
+									result.details.profitTarget || 0
+								).toFixed(2)}</td></tr>
+							</tbody>
+						</table>`;
+				}
+				html += `
+					<div style="margin-top: 16px; text-align: right;">
+						<button onclick="closeResultsModal()" class="btn-primary" style="padding: 8px 16px;">Close</button>
+					</div>`;
+				el.innerHTML = html;
+				document.getElementById('resultsModal').style.display = 'block';
+			}
+
+			async function migrateBuckets() {
+				if (!currentCategorySlug) {
+					alert('Please select a category first.');
+					return;
+				}
+
+				if (
+					!confirm(
+						'This will fix bucket format for all metrics in this category. Continue?'
+					)
+				) {
+					return;
+				}
+
+				try {
+					// Get category ID from slug
+					const categories = await fetchCategories();
+					const category = categories.find(
+						(c) => c.slug === currentCategorySlug
+					);
+					if (!category) {
+						alert('Category not found');
+						return;
+					}
+
+					const r = await fetch('/api/research/migrate-buckets', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ categoryId: category._id }),
+					});
+
+					if (!r.ok) {
+						const e = await r.json();
+						alert(
+							'Migration failed: ' + (e.error || 'Unknown error')
+						);
+						return;
+					}
+
+					const result = await r.json();
+					alert(
+						`Migration completed!\n\n${result.message}\nUpdated: ${result.updated} records`
+					);
+
+					// Refresh the page to show updated data
+					location.reload();
+				} catch (e) {
+					alert('Error during migration: ' + e.message);
+				}
+			}
+
+			refresh();
+		</script>
+	</body>
+</html>

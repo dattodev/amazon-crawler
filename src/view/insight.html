@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap"
+			rel="stylesheet"
+		/>
+		<link rel="stylesheet" href="/dashboard/dashboard.css" />
+		<title>Category Insight Dashboard</title>
+
+		<style>
+			:root {
+				--heatmap-green: #badc58;
+				--heatmap-red: #ff6b6b;
+				--heatmap-yellow: #feca57;
+				--heatmap-orange: #ff9f43;
+			}
+
+			input,
+			select,
+			button,
+			body {
+				font-family: 'Inter', sans-serif;
+			}
+
+			.category-insight-dashboard-wrapper {
+				width: 100%;
+				height: 100vh;
+				display: flex;
+				background: linear-gradient(180deg, #fafbfc 0%, #f4f6f8 100%);
+			}
+
+			/* Sidebar */
+			.sidebar {
+				width: 280px;
+				background: white;
+				border-right: 1px solid #e0e0e0;
+				display: flex;
+				flex-direction: column;
+				box-shadow: 2px 0 8px rgba(0, 0, 0, 0.06);
+			}
+
+			.sidebar-header {
+				padding: 20px;
+				border-bottom: 1px solid #f0f0f0;
+				background: #fafafa;
+			}
+
+			.sidebar-header h3 {
+				margin: 0 0 8px 0;
+				font-size: 18px;
+				font-weight: 600;
+				color: #333;
+			}
+
+			.sidebar-stats {
+				font-size: 12px;
+				color: #666;
+			}
+
+			.sidebar-actions {
+				margin-top: 12px;
+			}
+
+			.manage-categories-link {
+				display: inline-block;
+				padding: 8px 16px;
+				background: #2196f3;
+				color: white;
+				text-decoration: none;
+				border-radius: 6px;
+				font-size: 13px;
+				font-weight: 500;
+				transition: all 0.2s ease;
+				box-shadow: 0 2px 4px rgba(33, 150, 243, 0.2);
+			}
+
+			.manage-categories-link:hover {
+				background: #1976d2;
+				transform: translateY(-1px);
+				box-shadow: 0 4px 8px rgba(33, 150, 243, 0.3);
+			}
+
+			.sidebar-content {
+				flex: 1;
+				overflow-y: auto;
+			}
+
+			.category-list {
+				padding: 8px;
+			}
+
+			.category-item {
+				padding: 12px 16px;
+				margin: 4px 0;
+				border-radius: 8px;
+				cursor: pointer;
+				transition: all 0.2s ease;
+				border: 1px solid transparent;
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+			}
+
+			.category-item:hover {
+				background: #f8f9fa;
+				border-color: #e0e0e0;
+			}
+
+			.category-item.selected {
+				background: #e3f2fd;
+				border-color: #2196f3;
+				color: #1976d2;
+			}
+
+			.category-item .category-name {
+				font-weight: 500;
+				font-size: 14px;
+			}
+
+			.category-item .category-stats {
+				font-size: 11px;
+				color: #666;
+				opacity: 0.8;
+			}
+
+			.category-item.selected .category-stats {
+				color: #1976d2;
+			}
+
+			/* Main Content */
+			.main-content {
+				flex: 1;
+				padding: 40px;
+				overflow-y: auto;
+			}
+
+			/* Search section */
+			.search-section {
+				padding: 10px;
+				background-color: white;
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				border: 1px solid #ccc;
+				border-radius: 8px;
+				/* box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06); */
+			}
+
+			.search-section input {
+				flex: 1;
+				padding: 8px 12px;
+				border: 1px solid #ccc;
+				outline: none;
+				border-radius: 8px;
+			}
+
+			.date-filter select,
+			.clear-all-metrics-button button {
+				border: 1px solid #ccc;
+				outline: none;
+				border-radius: 8px;
+				outline: none;
+				padding: 8px 12px;
+				background-color: white;
+				cursor: pointer;
+			}
+
+			.select-metrics {
+				padding: 12px;
+				border: 1px solid #ccc;
+				outline: none;
+				border-radius: 8px;
+				background-color: #fff;
+				margin-top: 10px;
+				font-size: 14px;
+				/* box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06); */
+			}
+
+			.select-metrics-title {
+				font-weight: bold;
+			}
+
+			.list-metrics {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 10px;
+				margin-top: 10px;
+			}
+
+			.metric-item {
+				padding: 6px 12px;
+				border: 1px solid #ccc;
+				border-radius: 8px;
+				background-color: #fff;
+				cursor: pointer;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				gap: 12px;
+				transition: all 0.15s ease;
+			}
+			.metric-item:hover {
+				box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+				transform: translateY(-1px);
+			}
+
+			.metric-item.selected {
+				background-color: #2278d0;
+				color: #fff;
+				border-color: #2278d0;
+			}
+
+			.metric-item span {
+				font-size: 14px;
+			}
+
+			/* Heatmap */
+			.heatmap {
+				margin-top: 20px;
+				display: flex;
+				justify-content: flex-end;
+				align-items: center;
+				gap: 10px;
+				font-size: 12px;
+			}
+			.heatmap-color {
+				width: 120px;
+				border-radius: 50px;
+				height: 10px;
+				background: linear-gradient(
+					to right,
+					var(--heatmap-red),
+					var(--heatmap-orange),
+					var(--heatmap-yellow),
+					var(--heatmap-green)
+				);
+				border: 1px solid #eee;
+			}
+
+			/* Heatmap table */
+			.heatmap-table {
+				margin-top: 20px;
+			}
+
+			.heatmap-table-body {
+				/* box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); */
+				border: 1px solid #e0e0e0;
+				border-radius: 12px;
+				background-color: #fff;
+				font-size: 14px;
+				overflow: hidden;
+				margin-top: 20px;
+			}
+			/* Rows */
+			.heatmap-table-row {
+				border-bottom: 1px solid #f0f0f0;
+			}
+			.heatmap-table-row:last-child {
+				border-bottom: none;
+			}
+			.heatmap-table-row:hover {
+				background: #fdfdfd;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="category-insight-dashboard-wrapper">
+			<!-- Sidebar -->
+			<div class="sidebar">
+				<div class="sidebar-header">
+					<h3>Categories</h3>
+					<div class="sidebar-stats">
+						<span id="selectedCount">0</span> selected
+					</div>
+					<div class="sidebar-actions">
+						<a href="category.html" class="manage-categories-link">
+							Manage Categories
+						</a>
+					</div>
+				</div>
+				<div class="sidebar-content">
+					<div id="categoryList" class="category-list">
+						<!-- Categories will be loaded here -->
+					</div>
+				</div>
+			</div>
+
+			<!-- Main Content -->
+			<div class="main-content">
+				<!-- Search Section -->
+				<div class="search-section">
+					<input
+						id="categorySearch"
+						type="text"
+						placeholder="Search category..."
+					/>
+					<!-- Date filter -->
+					<div class="date-filter">
+						<select id="monthsFilter">
+							<option value="12" selected>Last 12 months</option>
+							<option value="6">Last 6 months</option>
+							<option value="3">Last 3 months</option>
+							<option value="1">Last 1 month</option>
+						</select>
+					</div>
+					<!-- Clear All Metrics Button -->
+					<div class="clear-all-metrics-button">
+						<button>Clear All Metrics</button>
+					</div>
+				</div>
+
+				<!-- Select Metrics -->
+				<div class="select-metrics">
+					<span class="select-metrics-title"> Select Metrics</span>
+					<div class="list-metrics">
+						<!-- List metrics will be rendered by JS here -->
+					</div>
+				</div>
+
+				<!-- Heatmap -->
+				<div class="heatmap">
+					<div class="heatmap-color"></div>
+					<div class="heatmap-title">Bad -> Good</div>
+				</div>
+
+				<!-- Heatmap table -->
+				<div class="heatmap-table">
+					<div class="heatmap-table-header">
+						<h3>
+							Category Insight - Heatmap by Time
+							<span class="selected-metric">(0)</span>
+						</h3>
+					</div>
+					<div class="heatmap-table-body">
+						<!-- Heatmap table body will be rendered by JS here -->
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Script -->
+		<script>
+			// === Config ===
+			const METRICS = [
+				// HIGHER IS BETTER metrics
+				{ code: 'sales_units', name: 'Sales (units)', unit: 'units' },
+				{ code: 'revenue', name: 'Revenue ($)', unit: 'usd' },
+				{ code: 'avg_ratings', name: 'Avg. Reviews', unit: 'count' },
+				{ code: 'avg_rating', name: 'Avg. Rating', unit: 'count' },
+				{
+					code: 'new_product_ratio',
+					name: 'New product ratio (%)',
+					unit: 'pct',
+				},
+				{ code: 'profit', name: 'Profit ($)', unit: 'usd' },
+				{ code: 'margin', name: 'Margin (%)', unit: 'pct' },
+				{ code: 'roi', name: 'ROI (%)', unit: 'pct' },
+
+				// LOWER IS BETTER metrics
+				{
+					code: 'listing_concentration',
+					name: 'Market concentration (Top10) (%)',
+					unit: 'pct',
+				},
+				{ code: 'referral_fee', name: 'Referral fee ($)', unit: 'usd' },
+				{ code: 'fba_fee', name: 'FBA fee ($)', unit: 'usd' },
+				{ code: 'cogs_cap', name: 'COGS ($)', unit: 'usd' },
+
+				// NEUTRAL metrics
+				{ code: 'avg_price', name: 'Avg. Price ($)', unit: 'usd' },
+			];
+
+			// Dynamic color mapping based on actual data values
+			// Colors are calculated relative to min/max values across all selected categories
+
+			const DEFAULT_SELECTED = new Set(['sales_units', 'revenue']);
+			const selected = new Set([...DEFAULT_SELECTED]);
+			const selectedCategories = new Set();
+			let monthsLimit = 12;
+			let allCategories = [];
+			let allCategoryData = new Map(); // categoryId -> data
+
+			function getQueryParam(name) {
+				const url = new URL(window.location.href);
+				return url.searchParams.get(name);
+			}
+
+			function bucketLabel(b) {
+				if (/^\d{4}-\d{2}$/.test(b)) {
+					const [y, m] = b.split('-');
+					return `${m}/${y}`;
+				}
+				if (b === 'top10') return 'Top10';
+				return b;
+			}
+
+			function formatValue(val, unit) {
+				if (val == null || isNaN(val)) return '';
+				if (unit === 'usd') {
+					if (val >= 1000000)
+						return `$${(val / 1000000).toFixed(0)}m`;
+					if (val >= 1000) return `$${(val / 1000).toFixed(0)}k`;
+					return `$${Number(val).toFixed(0)}`;
+				}
+				if (unit === 'units' || unit === 'count') {
+					if (val >= 1000000) return `${(val / 1000000).toFixed(0)}m`;
+					if (val >= 1000) return `${(val / 1000).toFixed(0)}k`;
+					return `${Number(val).toFixed(0)}`;
+				}
+				if (unit === 'pct') return `${Number(val).toFixed(0)}%`;
+				return String(val);
+			}
+
+			// Avoid rounding for FBA and Referral fees; do not use k/m compaction
+			function truncateDecimals(value, digits) {
+				if (typeof value !== 'number' || isNaN(value)) return value;
+				const factor = Math.pow(10, digits);
+				return Math.trunc(value * factor) / factor;
+			}
+
+			function formatMetricValue(metricCode, val, unit) {
+				if (val == null || isNaN(val)) return '';
+				if (metricCode === 'fba_fee' || metricCode === 'referral_fee') {
+					const v = truncateDecimals(Number(val), 2);
+					return `$${v}`;
+				}
+				return formatValue(val, unit);
+			}
+
+			// Dynamic color mapping based on actual data values
+
+			function mapMetricColor(metricCode, value, columnValues) {
+				// If no value or no data, return gray
+				if (value == null || isNaN(value)) {
+					return { bg: '#f5f5f5', fg: '#666666' };
+				}
+
+				// Define metric types
+				const HIGHER_IS_BETTER = [
+					'sales_units',
+					'revenue',
+					'avg_ratings',
+					'avg_rating',
+					'new_product_ratio',
+					'margin',
+					'profit',
+					'net_margin',
+					'ctr',
+					'cr',
+					'roi',
+					'roas',
+					'potential_score',
+				];
+
+				const LOWER_IS_BETTER = [
+					'listing_concentration',
+					'referral_fee',
+					'fba_fee',
+					'cogs_cap',
+					'acos',
+					'tacos',
+					'return_rate',
+					'cpc',
+					'cpp',
+				];
+
+				const NEUTRAL = ['avg_price', 'fulfillment_ratio'];
+
+				// For neutral metrics, always return gray
+				if (NEUTRAL.includes(metricCode)) {
+					return { bg: '#e8e8e8', fg: '#666666' };
+				}
+
+				// Get min and max values from this specific column (month)
+				const validValues = columnValues.filter(
+					(v) => typeof v === 'number' && !isNaN(v)
+				);
+				if (validValues.length === 0) {
+					return { bg: '#f5f5f5', fg: '#666666' };
+				}
+
+				const minValue = Math.min(...validValues);
+				const maxValue = Math.max(...validValues);
+
+				// If all values are the same, return neutral color
+				if (minValue === maxValue) {
+					return { bg: '#e8e8e8', fg: '#666666' };
+				}
+
+				// Calculate percentile ranges for this column
+				const range = maxValue - minValue;
+				const p25 = minValue + range * 0.25;
+				const p50 = minValue + range * 0.5;
+				const p75 = minValue + range * 0.75;
+
+				// Determine color based on metric type and value position within this column
+				let bg, fg;
+
+				if (HIGHER_IS_BETTER.includes(metricCode)) {
+					// Higher is better: Green = high, Red = low
+					if (value <= p25) {
+						// Bottom 25% - Red (worst)
+						bg = 'var(--heatmap-red)';
+						fg = '#ffffff';
+					} else if (value <= p50) {
+						// 25-50% - Orange
+						bg = 'var(--heatmap-orange)';
+						fg = '#ffffff';
+					} else if (value <= p75) {
+						// 50-75% - Yellow
+						bg = 'var(--heatmap-yellow)';
+						fg = '#0d0d0d';
+					} else {
+						// Top 25% - Green (best)
+						bg = 'var(--heatmap-green)';
+						fg = '#0d0d0d';
+					}
+				} else if (LOWER_IS_BETTER.includes(metricCode)) {
+					// Lower is better: Green = low, Red = high
+					if (value <= p25) {
+						// Bottom 25% - Green (best)
+						bg = 'var(--heatmap-green)';
+						fg = '#0d0d0d';
+					} else if (value <= p50) {
+						// 25-50% - Yellow
+						bg = 'var(--heatmap-yellow)';
+						fg = '#0d0d0d';
+					} else if (value <= p75) {
+						// 50-75% - Orange
+						bg = 'var(--heatmap-orange)';
+						fg = '#ffffff';
+					} else {
+						// Top 25% - Red (worst)
+						bg = 'var(--heatmap-red)';
+						fg = '#ffffff';
+					}
+				} else {
+					// Default to neutral gray for unknown metrics
+					return { bg: '#e8e8e8', fg: '#666666' };
+				}
+
+				return { bg, fg };
+			}
+
+			function renderMetricChips() {
+				const list = document.querySelector('.list-metrics');
+				list.innerHTML = '';
+				METRICS.forEach((m) => {
+					const div = document.createElement('div');
+					div.className =
+						'metric-item' +
+						(selected.has(m.code) ? ' selected' : '');
+					div.textContent = m.name;
+					div.onclick = () => {
+						if (selected.has(m.code)) selected.delete(m.code);
+						else selected.add(m.code);
+						// visually toggle selected state
+						div.classList.toggle('selected', selected.has(m.code));
+						document.querySelector(
+							'.selected-metric'
+						).textContent = `(${selected.size})`;
+						renderHeatmap();
+					};
+					list.appendChild(div);
+				});
+				document.querySelector(
+					'.selected-metric'
+				).textContent = `(${selected.size})`;
+				// Attach clear button
+				const clearBtn = document.querySelector(
+					'.clear-all-metrics-button button'
+				);
+				if (clearBtn && !clearBtn.__bound) {
+					clearBtn.onclick = () => {
+						selected.clear();
+						// update chip visuals
+						document
+							.querySelectorAll('.list-metrics .metric-item')
+							.forEach((el) => el.classList.remove('selected'));
+						document.querySelector('.selected-metric').textContent =
+							'(0)';
+						renderHeatmap();
+					};
+					clearBtn.__bound = true;
+				}
+			}
+
+			function buildValueMap(timeSeries) {
+				const map = {};
+				(timeSeries || []).forEach((p) => {
+					map[p.bucket] = p.value;
+				});
+				return map;
+			}
+
+			function renderHeatmap() {
+				const container = document.querySelector('.heatmap-table-body');
+				console.log(
+					'Rendering heatmap, selectedCategories:',
+					Array.from(selectedCategories)
+				);
+				console.log(
+					'allCategoryData keys:',
+					Array.from(allCategoryData.keys())
+				);
+
+				if (selectedCategories.size === 0) {
+					container.innerHTML =
+						'<p style="color:#999;text-align:center;padding:40px">Select categories from the sidebar to view heatmap</p>';
+					return;
+				}
+
+				// Collect all time buckets from selected categories
+				const allTimeBuckets = new Set();
+				selectedCategories.forEach((categoryId) => {
+					const data = allCategoryData.get(categoryId);
+					if (data && data.timeBuckets) {
+						data.timeBuckets.forEach((bucket) =>
+							allTimeBuckets.add(bucket)
+						);
+					}
+				});
+
+				// Listing concentration is monthly; do not add a separate Top10 column
+
+				// Filter out 'overall' bucket and sort
+				const rawBuckets = Array.from(allTimeBuckets).filter(
+					(b) => b !== 'overall'
+				);
+				const known = rawBuckets
+					.filter((b) => /^\d{4}-\d{2}$/.test(b))
+					.sort((a, b) => {
+						const aKey = parseInt(a.replace('-', ''), 10);
+						const bKey = parseInt(b.replace('-', ''), 10);
+						return bKey - aKey; // desc
+					});
+				const unknown = rawBuckets.filter(
+					(b) => !/^\d{4}-\d{2}$/.test(b)
+				);
+				let buckets = known.concat(unknown);
+
+				// Apply months limit only on known year-month buckets
+				if (monthsLimit && monthsLimit > 0) {
+					const limitedKnown = known.slice(0, monthsLimit);
+					buckets = limitedKnown.concat(unknown);
+				}
+
+				// No extra Top10 column
+
+				const gridCols = `220px 160px repeat(${buckets.length}, 120px)`;
+				const header = [
+					`<div style=\"position:sticky;top:0;z-index:2;background:#f8f9fa;display:grid;grid-template-columns:${gridCols};border-bottom:2px solid #e0e0e0;\" >`,
+					'<div style="font-weight:700;padding:16px 20px;color:#333;border-right:1px solid #e0e0e0">Category</div>',
+					'<div style="font-weight:700;padding:16px 20px;color:#333;border-right:1px solid #e0e0e0">Metric</div>',
+					buckets
+						.map(
+							(b) =>
+								`<div style=\"font-weight:700;padding:16px 8px;text-align:center;color:#333;border-right:1px solid #e0e0e0\">${bucketLabel(
+									b
+								)}</div>`
+						)
+						.join(''),
+					'</div>',
+				].join('');
+
+				// Prepare rows for all selected categories
+				const metricRows = [];
+				const selectedDefs = METRICS.filter((def) =>
+					selected.has(def.code)
+				);
+
+				// Helper: get value for specific metric and bucket with fallbacks
+				function getMetricValueForBucket(data, metricCode, bucket) {
+					if (!data) return null;
+					const ts = (data.timeSeriesData || []).find(
+						(m) => m.metric === metricCode
+					);
+					if (ts && Array.isArray(ts.timeSeries)) {
+						const hit = ts.timeSeries.find(
+							(p) => p.bucket === bucket
+						);
+						if (hit && typeof hit.value === 'number')
+							return hit.value;
+					}
+					// Category-level constant for FBA
+					if (
+						metricCode === 'fba_fee' &&
+						data?.category?.fbaFeeUsd != null
+					) {
+						const v = Number(data.category.fbaFeeUsd);
+						if (!Number.isNaN(v)) return v;
+					}
+					// Fallback to metricsSummary
+					if (Array.isArray(data?.metricsSummary)) {
+						const ms = data.metricsSummary.find(
+							(x) => x.metric === metricCode
+						);
+						if (ms && typeof ms.latestValue === 'number') {
+							// Treat some metrics as constant across months if sparse
+							if (
+								metricCode === 'referral_fee' ||
+								metricCode === 'listing_concentration' ||
+								ms.latestBucket === 'overall' ||
+								!ms.latestBucket ||
+								ms.latestBucket === bucket
+							) {
+								return ms.latestValue;
+							}
+						}
+					}
+					return null;
+				}
+
+				// Group values by category and metric (row) for per-row color calculation
+				const valuesByCategoryAndMetric = {};
+				selectedCategories.forEach((categoryId) => {
+					valuesByCategoryAndMetric[categoryId] = {};
+					selectedDefs.forEach((def) => {
+						valuesByCategoryAndMetric[categoryId][def.code] = [];
+
+						const data = allCategoryData.get(categoryId);
+						if (data && data.timeSeriesData) {
+							const metricData = data.timeSeriesData.find(
+								(m) => m.metric === def.code
+							);
+							if (metricData && metricData.timeSeries) {
+								metricData.timeSeries.forEach((ts) => {
+									if (
+										typeof ts.value === 'number' &&
+										buckets.includes(ts.bucket)
+									) {
+										valuesByCategoryAndMetric[categoryId][
+											def.code
+										].push(ts.value);
+									}
+								});
+							}
+
+							// Fallbacks when no series
+							if (
+								valuesByCategoryAndMetric[categoryId][def.code]
+									.length === 0
+							) {
+								let constantVal = null;
+								let fillAllBuckets = false;
+								// A) Category-level constant for FBA
+								if (def.code === 'fba_fee') {
+									const c = Number(data?.category?.fbaFeeUsd);
+									if (!Number.isNaN(c)) {
+										constantVal = c;
+										fillAllBuckets = true;
+									}
+								}
+								// B) Latest from metricsSummary (any metric)
+								if (
+									constantVal == null &&
+									Array.isArray(data?.metricsSummary)
+								) {
+									const ms = data.metricsSummary.find(
+										(x) => x.metric === def.code
+									);
+									if (
+										ms &&
+										typeof ms.latestValue === 'number'
+									) {
+										constantVal = ms.latestValue;
+										// For referral_fee and listing_concentration, treat as constant when sparse
+										fillAllBuckets =
+											def.code === 'referral_fee' ||
+											def.code ===
+												'listing_concentration' ||
+											ms.latestBucket === 'overall' ||
+											!ms.latestBucket;
+									}
+								}
+								// C) Try datasets[].metrics overall bucket (legacy)
+								if (
+									constantVal == null &&
+									Array.isArray(data?.datasets)
+								) {
+									for (const ds of data.datasets) {
+										const arr = ds.metrics?.[def.code];
+										if (Array.isArray(arr)) {
+											const ov = arr.find(
+												(m) => m.bucket === 'overall'
+											);
+											if (
+												ov &&
+												typeof ov.value === 'number'
+											) {
+												constantVal = ov.value;
+												fillAllBuckets = true;
+												break;
+											}
+										}
+									}
+								}
+								if (
+									constantVal != null &&
+									!Number.isNaN(constantVal)
+								) {
+									if (fillAllBuckets) {
+										buckets.forEach(() => {
+											valuesByCategoryAndMetric[
+												categoryId
+											][def.code].push(constantVal);
+										});
+									} else {
+										// Push once to enable color mapping at least
+										valuesByCategoryAndMetric[categoryId][
+											def.code
+										].push(constantVal);
+									}
+								}
+							}
+						}
+					});
+				});
+
+				// Additionally, synthesize row values for derived metrics using available inputs per bucket
+				selectedCategories.forEach((categoryId) => {
+					const data = allCategoryData.get(categoryId);
+					if (!data) return;
+					const rowStore =
+						valuesByCategoryAndMetric[categoryId] || {};
+					buckets.forEach((b) => {
+						const price = getMetricValueForBucket(
+							data,
+							'avg_price',
+							b
+						);
+						const referral =
+							getMetricValueForBucket(data, 'referral_fee', b) ||
+							0;
+						const fba =
+							getMetricValueForBucket(data, 'fba_fee', b) || 0;
+						if (typeof price === 'number') {
+							const ads = 0.2 * price;
+							const cogsAssumed = 0.2 * price;
+							const profitDollar =
+								price - (ads + referral + fba + cogsAssumed);
+							const marginPct =
+								price > 0 ? (profitDollar / price) * 100 : null;
+							const roiPct =
+								cogsAssumed > 0
+									? (profitDollar / cogsAssumed) * 100
+									: null;
+
+							(rowStore['profit'] ||= []).push(profitDollar);
+							(rowStore['margin'] ||= []).push(marginPct);
+							(rowStore['roi'] ||= []).push(roiPct);
+						}
+					});
+					valuesByCategoryAndMetric[categoryId] = rowStore;
+				});
+
+				selectedCategories.forEach((categoryId) => {
+					const data = allCategoryData.get(categoryId);
+					if (!data) return;
+
+					const byMetric = {};
+					(data.timeSeriesData || []).forEach(
+						(m) => (byMetric[m.metric] = m)
+					);
+
+					const availableCount = selectedDefs.filter(
+						(def) => (byMetric[def.code]?.timeSeries || []).length
+					).length;
+
+					// Create category group with proper styling
+					const categoryGroupRows = [];
+
+					selectedDefs.forEach((def, index) => {
+						const series = byMetric[def.code]?.timeSeries || [];
+						const valuesByBucket = buildValueMap(series);
+
+						const cells = buckets
+							.map((b) => {
+								let v = valuesByBucket[b];
+								// Compute derived metrics when missing
+								if (
+									v == null &&
+									(def.code === 'profit' ||
+										def.code === 'margin' ||
+										def.code === 'roi')
+								) {
+									const price = getMetricValueForBucket(
+										data,
+										'avg_price',
+										b
+									);
+									const referral =
+										getMetricValueForBucket(
+											data,
+											'referral_fee',
+											b
+										) || 0;
+									const fba =
+										getMetricValueForBucket(
+											data,
+											'fba_fee',
+											b
+										) || 0;
+									if (typeof price === 'number') {
+										const ads = 0.2 * price;
+										const cogsAssumed = 0.2 * price;
+										const profitDollar =
+											price -
+											(ads +
+												referral +
+												fba +
+												cogsAssumed);
+										if (def.code === 'profit')
+											v = profitDollar;
+										else if (def.code === 'margin')
+											v =
+												price > 0
+													? (profitDollar / price) *
+													  100
+													: null;
+										else if (def.code === 'roi')
+											v =
+												cogsAssumed > 0
+													? (profitDollar /
+															cogsAssumed) *
+													  100
+													: null;
+									}
+								}
+								// Per-cell fallback using metricsSummary and constants
+								if (v == null) {
+									// Listing concentration: if only summary exists, show across months
+									if (def.code === 'listing_concentration') {
+										const ms = Array.isArray(
+											data?.metricsSummary
+										)
+											? data.metricsSummary.find(
+													(x) =>
+														x.metric ===
+														'listing_concentration'
+											  )
+											: null;
+										if (
+											ms &&
+											typeof ms.latestValue ===
+												'number' &&
+											(ms.latestBucket === 'top10' ||
+												ms.latestBucket === 'overall' ||
+												!ms.latestBucket)
+										) {
+											v = ms.latestValue;
+										}
+									}
+									// Category-level FBA fee
+									if (
+										def.code === 'fba_fee' &&
+										data?.category?.fbaFeeUsd != null
+									) {
+										v = Number(data.category.fbaFeeUsd);
+									} else if (
+										Array.isArray(data?.metricsSummary)
+									) {
+										const ms = data.metricsSummary.find(
+											(x) => x.metric === def.code
+										);
+										if (
+											ms &&
+											typeof ms.latestValue === 'number'
+										) {
+											// For referral_fee, show latestValue across months
+											if (def.code === 'referral_fee') {
+												v = ms.latestValue;
+											} else if (
+												ms.latestBucket === 'overall' ||
+												!ms.latestBucket
+											) {
+												v = ms.latestValue;
+											} else if (ms.latestBucket === b) {
+												v = ms.latestValue;
+											}
+										}
+									}
+								}
+								// Get values for this specific category and metric (row)
+								const rowValues =
+									valuesByCategoryAndMetric[categoryId][
+										def.code
+									] || [];
+								const { bg, fg } = mapMetricColor(
+									def.code,
+									v,
+									rowValues
+								);
+								const label = formatMetricValue(
+									def.code,
+									v,
+									def.unit
+								);
+								return `<div style=\"padding:12px 8px;text-align:center;display:flex;justify-content:center;align-items:center;\"><span style=\"display:inline-block;padding:8px 16px;border-radius:8px;background:${bg};color:${fg};width: 100%;font-weight:600;font-size:13px;min-width:60px;text-align:center;text-transform: uppercase;border: 1px solid ${bg}\">${
+									label || '-'
+								}</span></div>`;
+							})
+							.join('');
+
+						// Category name only on first metric row
+						const firstCol =
+							index === 0
+								? `<div style=\"padding:10px 20px;color:#333;font-weight:700;border-right:1px solid #e0e0e0;background:white\">${
+										data.category?.name || ''
+								  }<div style=\"color:#999;font-size:12px;font-weight:500;margin-top:4px\">${availableCount} metric${
+										availableCount === 1 ? '' : 's'
+								  }</div></div>`
+								: '<div style="border-right:1px solid #e0e0e0;background:white"></div>';
+
+						// No internal borders between metrics of same category
+						const borderBottom =
+							index === selectedDefs.length - 1
+								? 'border-bottom:1px solid #e0e0e0'
+								: 'border-bottom:none';
+
+						categoryGroupRows.push(
+							`<div style=\"display:grid;grid-template-columns:${gridCols};background:white;${borderBottom}\">` +
+								firstCol +
+								`<div style=\"padding:10px;color:#444;font-weight:600;border-right:1px solid #e0e0e0;background:white;display:flex;align-items:center;justify-content:start\">${def.name}</div>` +
+								cells +
+								'</div>'
+						);
+					});
+
+					metricRows.push(...categoryGroupRows);
+				});
+
+				container.innerHTML = header + metricRows.join('');
+			}
+
+			async function loadCategories() {
+				try {
+					const r = await fetch('/api/research/categories');
+					if (!r.ok) throw new Error('Failed to load categories');
+					allCategories = await r.json();
+					renderCategoryList();
+
+					// Auto-select category from URL parameter after categories are loaded
+					const categoryId = getQueryParam('id');
+					if (categoryId) {
+						// Check if the category exists in the loaded list
+						const categoryExists = allCategories.some(
+							(cat) => cat._id === categoryId
+						);
+						if (categoryExists) {
+							await toggleCategory(categoryId);
+							console.log(
+								'Auto-selected category from URL:',
+								categoryId
+							);
+						} else {
+							console.warn('Category not found:', categoryId);
+						}
+					}
+				} catch (e) {
+					console.error('Failed to load categories:', e);
+					document.getElementById('categoryList').innerHTML =
+						'<p style="color:#e53935;padding:20px;text-align:center">Failed to load categories</p>';
+				}
+			}
+
+			function renderCategoryList(filterText = '') {
+				const container = document.getElementById('categoryList');
+				container.innerHTML = '';
+
+				const q = String(filterText || '')
+					.toLowerCase()
+					.trim();
+				const list = q
+					? allCategories.filter((c) =>
+							String(c.name || '')
+								.toLowerCase()
+								.includes(q)
+					  )
+					: allCategories;
+
+				list.forEach((category) => {
+					const div = document.createElement('div');
+					div.className = 'category-item';
+					div.dataset.categoryId = category._id;
+
+					div.innerHTML = `
+						<div class="category-name">${
+							category.name.length > 12
+								? category.name.substring(0, 12) + '...'
+								: category.name
+						}</div>
+						<div class="category-stats">Click to add</div>
+					`;
+
+					div.onclick = () => toggleCategory(category._id);
+					container.appendChild(div);
+				});
+			}
+
+			async function selectOnlyCategory(categoryId) {
+				try {
+					// Clear current selection
+					selectedCategories.clear();
+					allCategoryData.clear();
+					updateCategorySelection();
+					updateSelectedCount();
+
+					// Add and load the requested category
+					selectedCategories.add(categoryId);
+					if (!allCategoryData.has(categoryId)) {
+						const r = await fetch(
+							`/api/research/category/${categoryId}`
+						);
+						if (r.ok) {
+							const data = await r.json();
+							allCategoryData.set(categoryId, data);
+						}
+					}
+					updateCategorySelection();
+					updateSelectedCount();
+					renderHeatmap();
+				} catch (e) {
+					console.error('Failed to select only category:', e);
+				}
+			}
+
+			async function toggleCategory(categoryId) {
+				console.log('Toggling category:', categoryId);
+				if (selectedCategories.has(categoryId)) {
+					selectedCategories.delete(categoryId);
+					allCategoryData.delete(categoryId);
+					console.log('Removed category:', categoryId);
+				} else {
+					selectedCategories.add(categoryId);
+					console.log('Added category:', categoryId);
+					// Load category data if not already loaded
+					if (!allCategoryData.has(categoryId)) {
+						try {
+							console.log(
+								'Loading data for category:',
+								categoryId
+							);
+							const r = await fetch(
+								`/api/research/category/${categoryId}`
+							);
+							if (r.ok) {
+								const data = await r.json();
+								console.log('Loaded category data:', data);
+								allCategoryData.set(categoryId, data);
+							} else {
+								console.error(
+									'Failed to load category data, status:',
+									r.status
+								);
+							}
+						} catch (e) {
+							console.error('Failed to load category data:', e);
+						}
+					} else {
+						console.log(
+							'Category data already loaded:',
+							categoryId
+						);
+					}
+				}
+
+				// Update UI
+				updateCategorySelection();
+				updateSelectedCount();
+				renderHeatmap();
+			}
+
+			function updateCategorySelection() {
+				document.querySelectorAll('.category-item').forEach((item) => {
+					const categoryId = item.dataset.categoryId;
+					if (selectedCategories.has(categoryId)) {
+						item.classList.add('selected');
+						item.querySelector('.category-stats').textContent =
+							'Selected';
+					} else {
+						item.classList.remove('selected');
+						item.querySelector('.category-stats').textContent =
+							'Click to add';
+					}
+				});
+			}
+
+			function updateSelectedCount() {
+				document.getElementById('selectedCount').textContent =
+					selectedCategories.size;
+			}
+
+			async function loadCategory() {
+				// Legacy function - now just load all categories
+				await loadCategories();
+			}
+
+			// Init
+			renderMetricChips();
+			loadCategory();
+
+			// Search wiring
+			const searchInput = document.getElementById('categorySearch');
+			if (searchInput) {
+				if (!searchInput.__bound) {
+					searchInput.addEventListener('input', (e) => {
+						renderCategoryList(e.target.value || '');
+					});
+					searchInput.addEventListener('keydown', async (e) => {
+						if (e.key === 'Enter') {
+							const q = String(searchInput.value || '')
+								.toLowerCase()
+								.trim();
+							if (!q) return;
+							const match = allCategories.find((c) =>
+								String(c.name || '')
+									.toLowerCase()
+									.includes(q)
+							);
+							if (match) {
+								await selectOnlyCategory(match._id);
+								// keep filtered list focused on the selected one
+								renderCategoryList(q);
+							}
+						}
+					});
+					searchInput.__bound = true;
+				}
+			}
+
+			const monthsSelect = document.getElementById('monthsFilter');
+			if (monthsSelect) {
+				monthsSelect.addEventListener('change', () => {
+					monthsLimit =
+						parseInt(monthsSelect.value || '12', 10) || 12;
+					renderHeatmap();
+				});
+			}
+		</script>
+	</body>
+</html>

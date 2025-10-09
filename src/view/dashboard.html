@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<!-- Inter font Google Fonts -->
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap"
+			rel="stylesheet"
+		/>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Product Dashboard</title>
+		<link rel="stylesheet" href="/dashboard/dashboard.css" />
+	</head>
+	<body>
+		<div class="main-layout">
+			<!-- TAB NAVIGATION -->
+			<div class="tab-navigation">
+				<button
+					id="regularTab"
+					class="tab-btn active"
+					onclick="switchTabWrapper('regular')"
+				>
+					<span class="tab-icon"></span>
+					<span class="tab-text">Sản phẩm thường</span>
+				</button>
+				<button
+					id="bestsellersTab"
+					class="tab-btn"
+					onclick="switchTabWrapper('bestsellers')"
+				>
+					<span class="tab-icon"></span>
+					<span class="tab-text">Best Sellers & New Releases</span>
+				</button>
+				<button
+					id="feeruleTab"
+					class="tab-btn"
+					onclick="switchTabWrapper('feerule')"
+				>
+					<span class="tab-icon"></span>
+					<span class="tab-text">Fee Rules</span>
+				</button>
+				<button
+					id="fbafeeTab"
+					class="tab-btn"
+					onclick="switchTabWrapper('fbafee')"
+				>
+					<span class="tab-icon"></span>
+					<span class="tab-text">FBA Fee Rules</span>
+				</button>
+				<button
+					id="sizetierTab"
+					class="tab-btn"
+					onclick="switchTabWrapper('sizetier')"
+				>
+					<span class="tab-icon"></span>
+					<span class="tab-text">Size Tier Rules</span>
+				</button>
+			</div>
+
+			<div class="content-layout">
+				<!-- SIDEBAR -->
+				<aside id="sidebar" class="sidebar">
+					<!-- Stats Section -->
+					<div class="stats-section">
+						<!-- <h2 class="stats-heading">Product Statistics</h2> -->
+						<div class="stats-container">
+							<!-- <div class="stat-item">
+							<span class="stat-label">Total Products:</span>
+							<span class="stat-value" id="total-products-count"
+								>0</span
+							>
+						</div> -->
+							<div class="stat-item">
+								<span class="stat-label"
+									>Số sản phẩm đang hiển thị:
+								</span>
+								<span
+									class="stat-value"
+									id="showing-products-count"
+									>0</span
+								>
+							</div>
+							<!-- <div class="stat-item">
+							<span class="stat-label">With Price:</span>
+							<span class="stat-value" id="with-price-count"
+								>0</span
+							>
+						</div> -->
+							<!-- <div class="stat-item">
+							<span class="stat-label">With Rating:</span>
+							<span class="stat-value" id="with-rating-count"
+								>0</span
+							>
+						</div> -->
+						</div>
+					</div>
+
+					<div class="filter-section">
+						<h2 class="filter-heading">Sellers</h2>
+						<div id="sellerFilters" class="filter-options"></div>
+					</div>
+					<div class="filter-section">
+						<h2 class="filter-heading">Categories</h2>
+						<div id="categoryFilters" class="filter-options"></div>
+					</div>
+					<div class="filter-section">
+						<h2 class="filter-heading">Source</h2>
+						<div id="sourceFilters" class="filter-options"></div>
+					</div>
+				</aside>
+				<!-- MAIN -->
+				<main class="main-content">
+					<div class="container">
+						<!-- FILTER BAR -->
+						<div id="filter-bar" class="filter-bar">
+							<div class="filter-toolbar">
+								<!-- Search Input -->
+								<div class="search-section">
+									<input
+										type="text"
+										id="searchInput"
+										class="search-input"
+										placeholder="Search products..."
+									/>
+									<button
+										onclick="filterProducts()"
+										class="search-btn"
+									>
+										<svg
+											width="16"
+											height="16"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+										>
+											<circle
+												cx="11"
+												cy="11"
+												r="8"
+											></circle>
+											<path d="m21 21-4.35-4.35"></path>
+										</svg>
+									</button>
+								</div>
+
+								<!-- Sort Dropdown -->
+								<div class="dropdown">
+									<button
+										class="dropdown-btn"
+										onclick="toggleDropdown('sort')"
+									>
+										<span id="sortText">Sort by</span>
+										<svg
+											width="12"
+											height="12"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+										>
+											<polyline
+												points="6,9 12,15 18,9"
+											></polyline>
+										</svg>
+									</button>
+									<div
+										id="sortDropdown"
+										class="dropdown-content"
+									>
+										<div
+											class="dropdown-item"
+											onclick="selectSort('')"
+										>
+											-- Select --
+										</div>
+										<div
+											class="dropdown-item"
+											onclick="selectSort('price_asc')"
+										>
+											Price: Low to High
+										</div>
+										<div
+											class="dropdown-item"
+											onclick="selectSort('price_desc')"
+										>
+											Price: High to Low
+										</div>
+										<div
+											class="dropdown-item"
+											onclick="selectSort('date_asc')"
+										>
+											Date: Oldest to Newest
+										</div>
+										<div
+											class="dropdown-item"
+											onclick="selectSort('date_desc')"
+										>
+											Date: Newest to Oldest
+										</div>
+										<div
+											class="dropdown-item"
+											onclick="selectSort('bought_desc')"
+										>
+											Bought: High to Low
+										</div>
+										<div
+											class="dropdown-item"
+											onclick="selectSort('bought_asc')"
+										>
+											Bought: Low to High
+										</div>
+										<div
+											class="dropdown-item"
+											onclick="selectSort('rank_asc')"
+										>
+											Rank: Low to High
+										</div>
+										<div
+											class="dropdown-item"
+											onclick="selectSort('rank_desc')"
+										>
+											Rank: High to Low
+										</div>
+									</div>
+								</div>
+
+								<!-- Quick Filter Dropdown -->
+								<div class="dropdown">
+									<button
+										class="dropdown-btn"
+										onclick="toggleDropdown('quickFilter')"
+									>
+										<span id="quickFilterText"
+											>Quick Filter</span
+										>
+										<svg
+											width="12"
+											height="12"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+										>
+											<polyline
+												points="6,9 12,15 18,9"
+											></polyline>
+										</svg>
+									</button>
+									<div
+										id="quickFilterDropdown"
+										class="dropdown-content quick-filter-panel"
+									>
+										<div class="quick-filter-section">
+											<h4>Templates</h4>
+											<div
+												id="templateList"
+												class="template-list"
+											>
+												<!-- Templates will be loaded here -->
+											</div>
+										</div>
+									</div>
+								</div>
+
+								<!-- Filter Button -->
+								<button
+									class="filter-btn"
+									onclick="toggleFilterPanel()"
+								>
+									<svg
+										width="16"
+										height="16"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path
+											d="M3 6h18M7 12h10M10 18h4"
+										></path>
+									</svg>
+									<span>Filter & Sort</span>
+								</button>
+
+								<!-- Image Only Dropdown -->
+								<div class="dropdown">
+									<button
+										class="dropdown-btn"
+										onclick="toggleDropdown('imageonly')"
+									>
+										<span id="imageOnlyText"
+											>Image only</span
+										>
+										<svg
+											width="12"
+											height="12"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+										>
+											<polyline
+												points="6,9 12,15 18,9"
+											></polyline>
+										</svg>
+									</button>
+									<div
+										id="imageonlyDropdown"
+										class="dropdown-content"
+									>
+										<div
+											class="dropdown-item"
+											onclick="selectImageOnly(0)"
+										>
+											Off
+										</div>
+										<div
+											class="dropdown-item"
+											onclick="selectImageOnly(4)"
+										>
+											4×
+										</div>
+										<div
+											class="dropdown-item"
+											onclick="selectImageOnly(5)"
+										>
+											5×
+										</div>
+										<div
+											class="dropdown-item"
+											onclick="selectImageOnly(6)"
+										>
+											6×
+										</div>
+									</div>
+								</div>
+
+								<!-- View Toggle -->
+								<div class="view-toggle">
+									<button
+										id="gridBtn"
+										class="view-btn active"
+										onclick="switchView('grid')"
+									>
+										<svg
+											width="16"
+											height="16"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+										>
+											<rect
+												x="3"
+												y="3"
+												width="7"
+												height="7"
+											></rect>
+											<rect
+												x="14"
+												y="3"
+												width="7"
+												height="7"
+											></rect>
+											<rect
+												x="14"
+												y="14"
+												width="7"
+												height="7"
+											></rect>
+											<rect
+												x="3"
+												y="14"
+												width="7"
+												height="7"
+											></rect>
+										</svg>
+										Grid
+									</button>
+									<button
+										id="tableBtn"
+										class="view-btn"
+										onclick="switchView('table')"
+									>
+										<svg
+											width="16"
+											height="16"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+										>
+											<path
+												d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"
+											></path>
+										</svg>
+										Table
+									</button>
+								</div>
+							</div>
+						</div>
+
+						<!-- Regular Products Tab Content -->
+						<div id="regularTabContent" class="tab-content active">
+							<div id="productList" class="product-list"></div>
+							<div id="productTable" style="display: none"></div>
+						</div>
+
+						<!-- Best Sellers Tab Content -->
+						<div id="bestsellersTabContent" class="tab-content">
+							<div
+								id="bestsellersProductList"
+								class="product-list"
+							></div>
+							<div
+								id="bestsellersProductTable"
+								style="display: none"
+							></div>
+						</div>
+
+						<!-- Fee Rule Tab Content -->
+						<div id="feeruleTabContent" class="tab-content">
+							<div
+								class="fee-rule-actions"
+								style="
+									margin-bottom: 12px;
+									display: flex;
+									gap: 8px;
+									align-items: center;
+								"
+							>
+								<button
+									class="apply-btn"
+									onclick="openFeeRuleForm()"
+								>
+									New Rule
+								</button>
+								<button
+									class="reset-btn"
+									onclick="reloadFeeRules()"
+								>
+									Reload
+								</button>
+								<label class="file-upload">
+									<input
+										type="file"
+										id="feeRuleFile"
+										accept=".xlsx,.xls"
+										onchange="importFeeRulesFromExcel(this)"
+										style="display: none"
+									/>
+									<button
+										class="apply-btn"
+										onclick="document.getElementById('feeRuleFile').click()"
+									>
+										Import Excel
+									</button>
+								</label>
+							</div>
+							<!-- Inline Fee Rule Form (hidden by default) -->
+							<div
+								id="feeRuleInlineForm"
+								style="
+									display: none;
+									background: #fff;
+									border: 1px solid #e0e0e0;
+									border-radius: 8px;
+									padding: 12px;
+									margin-bottom: 12px;
+								"
+							>
+								<div
+									style="
+										display: flex;
+										gap: 8px;
+										flex-wrap: wrap;
+										align-items: center;
+									"
+								>
+									<input type="hidden" id="fr_id" />
+									<input
+										type="text"
+										id="fr_category"
+										placeholder="Category"
+									/>
+									<input
+										type="number"
+										step="0.01"
+										id="fr_priceMin"
+										placeholder="Price Min"
+									/>
+									<span>-</span>
+									<input
+										type="number"
+										step="0.01"
+										id="fr_priceMax"
+										placeholder="Price Max"
+									/>
+									<input
+										type="text"
+										id="fr_applyTo"
+										placeholder="Apply To"
+									/>
+									<input
+										type="number"
+										step="0.01"
+										id="fr_feePercent"
+										placeholder="Fee %"
+									/>
+									<input
+										type="number"
+										step="0.01"
+										id="fr_minFeeUSD"
+										placeholder="Min Fee (USD)"
+									/>
+									<input
+										type="text"
+										id="fr_variant"
+										placeholder="Variant"
+									/>
+									<button
+										class="apply-btn"
+										onclick="submitFeeRuleForm()"
+									>
+										Save
+									</button>
+									<button
+										class="reset-btn"
+										onclick="hideFeeRuleInlineForm()"
+									>
+										Cancel
+									</button>
+								</div>
+							</div>
+							<div id="feeRuleTable"></div>
+						</div>
+
+						<!-- FBA Fee Rule Tab Content -->
+						<div id="fbafeeTabContent" class="tab-content">
+							<div
+								class="fee-rule-actions"
+								style="
+									margin-bottom: 12px;
+									display: flex;
+									gap: 8px;
+									align-items: center;
+								"
+							>
+								<button
+									class="apply-btn"
+									onclick="openFbaFeeForm()"
+								>
+									New Rule
+								</button>
+								<button
+									class="reset-btn"
+									onclick="reloadFbaFeeRules()"
+								>
+									Reload
+								</button>
+								<label class="file-upload">
+									<input
+										type="file"
+										id="fbaFeeFile"
+										accept=".xlsx,.xls"
+										onchange="importFbaFeeRulesFromExcel(this)"
+										style="display: none"
+									/>
+									<button
+										class="apply-btn"
+										onclick="document.getElementById('fbaFeeFile').click()"
+									>
+										Import Excel
+									</button>
+								</label>
+							</div>
+							<!-- Inline FBA Fee Rule Form (hidden by default) -->
+							<div
+								id="fbaFeeInlineForm"
+								class="fee-rule-form"
+								style="display: none"
+							>
+								<input type="hidden" id="ff_id" />
+								<div class="form-grid">
+									<div class="form-item">
+										<label for="ff_tier">Tier</label>
+										<input
+											type="text"
+											id="ff_tier"
+											placeholder="e.g. Small Standard"
+										/>
+									</div>
+									<div class="form-item">
+										<label>Weight Range</label>
+										<div class="form-row">
+											<input
+												type="number"
+												step="0.01"
+												id="ff_weightMin"
+												placeholder="Min"
+											/>
+											<span class="range-sep">–</span>
+											<input
+												type="number"
+												step="0.01"
+												id="ff_weightMax"
+												placeholder="Max (0 = All)"
+											/>
+										</div>
+									</div>
+									<div class="form-item">
+										<label for="ff_unit">Unit</label>
+										<select id="ff_unit">
+											<option value="oz">oz</option>
+											<option value="lb">lb</option>
+											<option value="g">g</option>
+											<option value="kg">kg</option>
+										</select>
+									</div>
+									<div class="form-item">
+										<label for="ff_feeUSD">Fee (USD)</label>
+										<input
+											type="number"
+											step="0.01"
+											id="ff_feeUSD"
+											placeholder="e.g. 3.06"
+										/>
+									</div>
+									<div class="form-item">
+										<label for="ff_baseUSD"
+											>Base (USD)</label
+										>
+										<input
+											type="number"
+											step="0.01"
+											id="ff_baseUSD"
+											placeholder="e.g. 6.92"
+										/>
+									</div>
+									<div class="form-item">
+										<label>Overage Threshold</label>
+										<div class="form-row">
+											<input
+												type="number"
+												step="0.01"
+												id="ff_overThresholdValue"
+												placeholder="e.g. 3.00"
+											/>
+											<select id="ff_overThresholdUnit">
+												<option value="oz">oz</option>
+												<option value="lb">lb</option>
+												<option value="g">g</option>
+												<option value="kg">kg</option>
+											</select>
+										</div>
+									</div>
+									<div class="form-item">
+										<label>Overage Step</label>
+										<div class="form-row">
+											<input
+												type="number"
+												step="0.01"
+												id="ff_stepValue"
+												placeholder="e.g. 4.00"
+											/>
+											<select id="ff_stepUnit">
+												<option value="oz">oz</option>
+												<option value="lb">lb</option>
+												<option value="g">g</option>
+												<option value="kg">kg</option>
+											</select>
+										</div>
+									</div>
+									<div class="form-item">
+										<label for="ff_stepFeeUSD"
+											>Overage Step Fee (USD)</label
+										>
+										<input
+											type="number"
+											step="0.01"
+											id="ff_stepFeeUSD"
+											placeholder="e.g. 0.08"
+										/>
+									</div>
+									<div class="form-item">
+										<label for="ff_variant">Variant</label>
+										<input
+											type="text"
+											id="ff_variant"
+											placeholder="Optional notes"
+										/>
+									</div>
+								</div>
+								<div class="form-actions">
+									<button
+										class="apply-btn"
+										onclick="submitFbaFeeForm()"
+									>
+										Save
+									</button>
+									<button
+										class="reset-btn"
+										onclick="hideFbaFeeInlineForm()"
+									>
+										Cancel
+									</button>
+								</div>
+							</div>
+							<div id="fbaFeeRuleTable"></div>
+						</div>
+
+						<!-- Size Tier Rules Tab Content -->
+						<div id="sizetierTabContent" class="tab-content">
+							<div
+								class="fee-rule-actions"
+								style="
+									margin-bottom: 12px;
+									display: flex;
+									gap: 8px;
+									align-items: center;
+								"
+							>
+								<button
+									class="apply-btn"
+									onclick="openSizeTierForm()"
+								>
+									New Rule
+								</button>
+								<button
+									class="reset-btn"
+									onclick="reloadSizeTierRules()"
+								>
+									Reload
+								</button>
+								<label class="file-upload">
+									<input
+										type="file"
+										id="sizeTierFile"
+										accept=".xlsx,.xls"
+										onchange="importSizeTierRulesFromExcel(this)"
+										style="display: none"
+									/>
+									<button
+										class="apply-btn"
+										onclick="document.getElementById('sizeTierFile').click()"
+									>
+										Import Excel
+									</button>
+								</label>
+							</div>
+							<div
+								id="sizeTierInlineForm"
+								style="display: none"
+								class="fee-rule-form"
+							>
+								<input type="hidden" id="st_id" />
+								<div class="form-grid">
+									<div class="form-item">
+										<label for="st_tier">Tier</label>
+										<input
+											type="text"
+											id="st_tier"
+											placeholder="Small standard-size"
+										/>
+									</div>
+									<div class="form-item">
+										<label for="st_shippingWeightMax"
+											>Shipping weight max</label
+										>
+										<input
+											type="number"
+											step="0.01"
+											id="st_shippingWeightMax"
+											placeholder="e.g. 20"
+										/>
+									</div>
+									<div class="form-item">
+										<label for="st_longestMax"
+											>Longest side max</label
+										>
+										<input
+											type="number"
+											step="0.01"
+											id="st_longestMax"
+											placeholder="e.g. 15"
+										/>
+									</div>
+									<div class="form-item">
+										<label for="st_medianMax"
+											>Median side max</label
+										>
+										<input
+											type="number"
+											step="0.01"
+											id="st_medianMax"
+											placeholder="e.g. 12"
+										/>
+									</div>
+									<div class="form-item">
+										<label for="st_shortestMax"
+											>Shortest side max</label
+										>
+										<input
+											type="number"
+											step="0.01"
+											id="st_shortestMax"
+											placeholder="e.g. 0.75"
+										/>
+									</div>
+									<div class="form-item">
+										<label for="st_lengthGirthMax"
+											>Length + girth max</label
+										>
+										<input
+											type="number"
+											step="0.01"
+											id="st_lengthGirthMax"
+											placeholder="e.g. 130"
+										/>
+									</div>
+									<div class="form-item">
+										<label for="st_unitLength"
+											>Length unit</label
+										>
+										<select id="st_unitLength">
+											<option value="in">in</option>
+											<option value="cm">cm</option>
+										</select>
+									</div>
+									<div class="form-item">
+										<label for="st_unitWeight"
+											>Weight unit</label
+										>
+										<select id="st_unitWeight">
+											<option value="oz">oz</option>
+											<option value="lb" selected>
+												lb
+											</option>
+											<option value="g">g</option>
+											<option value="kg">kg</option>
+										</select>
+									</div>
+									<div class="form-item">
+										<label for="st_variant">Variant</label>
+										<input
+											type="text"
+											id="st_variant"
+											placeholder="Optional notes"
+										/>
+									</div>
+								</div>
+								<div class="form-actions">
+									<button
+										class="apply-btn"
+										onclick="submitSizeTierForm()"
+									>
+										Save
+									</button>
+									<button
+										class="reset-btn"
+										onclick="hideSizeTierInlineForm()"
+									>
+										Cancel
+									</button>
+								</div>
+							</div>
+							<div id="sizeTierRuleTable"></div>
+						</div>
+					</div>
+				</main>
+			</div>
+		</div>
+
+		<!-- Filter Panel Overlay -->
+		<div
+			id="filterOverlay"
+			class="filter-overlay"
+			onclick="closeFilterPanel()"
+		></div>
+
+		<!-- Filter Panel -->
+		<div id="filterPanel" class="filter-panel">
+			<div class="filter-panel-header">
+				<h3>Filter & Sort</h3>
+				<button class="close-filter-btn" onclick="closeFilterPanel()">
+					<svg
+						width="20"
+						height="20"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<line x1="18" y1="6" x2="6" y2="18"></line>
+						<line x1="6" y1="6" x2="18" y2="18"></line>
+					</svg>
+				</button>
+			</div>
+
+			<div class="filter-panel-content">
+				<!-- Applied Filters -->
+				<div class="applied-filters-section">
+					<div class="applied-filters-header">
+						<span>Applied Filters</span>
+						<button
+							class="clear-all-btn"
+							onclick="clearAllFilters()"
+						>
+							Clear all
+						</button>
+					</div>
+					<div id="appliedFiltersTags" class="applied-filters-tags">
+						<!-- Applied filter tags will be inserted here -->
+					</div>
+				</div>
+
+				<!-- Template Section -->
+				<div class="template-section">
+					<div class="template-header">
+						<span>Save Template</span>
+					</div>
+					<div class="template-content">
+						<div class="template-input-group">
+							<input
+								type="text"
+								id="templateName"
+								placeholder="Enter template name..."
+								class="template-input"
+							/>
+							<button
+								class="save-template-btn"
+								onclick="saveCurrentFiltersAsTemplate()"
+							>
+								Save
+							</button>
+						</div>
+					</div>
+				</div>
+
+				<!-- Filter Sections -->
+				<div class="filter-sections">
+					<!-- Bought Filter -->
+					<div class="filter-section">
+						<div
+							class="filter-section-header"
+							onclick="toggleFilterSection('bought')"
+						>
+							<span>Bought</span>
+							<svg
+								class="filter-arrow"
+								width="12"
+								height="12"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+							>
+								<polyline points="6,9 12,15 18,9"></polyline>
+							</svg>
+						</div>
+						<div
+							id="boughtFilterContent"
+							class="filter-section-content"
+						>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="boughtFilter"
+									value="all"
+									checked
+								/>
+								<span>All</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="boughtFilter"
+									value="200"
+								/>
+								<span>≥200</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="boughtFilter"
+									value="300"
+								/>
+								<span>≥300</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="boughtFilter"
+									value="400"
+								/>
+								<span>≥400</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="boughtFilter"
+									value="500"
+								/>
+								<span>≥500</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="boughtFilter"
+									value="600"
+								/>
+								<span>≥600</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="boughtFilter"
+									value="700"
+								/>
+								<span>≥700</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="boughtFilter"
+									value="800"
+								/>
+								<span>≥800</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="boughtFilter"
+									value="900"
+								/>
+								<span>≥900</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="boughtFilter"
+									value="1000"
+								/>
+								<span>≥1000</span>
+							</label>
+						</div>
+					</div>
+
+					<!-- New Arrival Filter -->
+					<div class="filter-section">
+						<div
+							class="filter-section-header"
+							onclick="toggleFilterSection('newArrival')"
+						>
+							<span>New Arrival</span>
+							<svg
+								class="filter-arrow"
+								width="12"
+								height="12"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+							>
+								<polyline points="6,9 12,15 18,9"></polyline>
+							</svg>
+						</div>
+						<div
+							id="newArrivalFilterContent"
+							class="filter-section-content"
+						>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="newArrivalFilter"
+									value="all"
+									checked
+								/>
+								<span>All</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="newArrivalFilter"
+									value="7"
+								/>
+								<span>Last 7 days</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="newArrivalFilter"
+									value="30"
+								/>
+								<span>Last 30 days</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="newArrivalFilter"
+									value="90"
+								/>
+								<span>Last 90 days</span>
+							</label>
+						</div>
+					</div>
+
+					<!-- Fulfillment Filter -->
+					<div class="filter-section">
+						<div
+							class="filter-section-header"
+							onclick="toggleFilterSection('fulfillment')"
+						>
+							<span>Fulfillment</span>
+							<svg
+								class="filter-arrow"
+								width="12"
+								height="12"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+							>
+								<polyline points="6,9 12,15 18,9"></polyline>
+							</svg>
+						</div>
+						<div
+							id="fulfillmentFilterContent"
+							class="filter-section-content"
+						>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="fulfillmentFilter"
+									value="all"
+									checked
+								/>
+								<span>All</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="fulfillmentFilter"
+									value="FBA"
+								/>
+								<span>FBA</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="fulfillmentFilter"
+									value="FBM"
+								/>
+								<span>FBM</span>
+							</label>
+						</div>
+					</div>
+
+					<!-- FBA Fee Filter -->
+					<div class="filter-section">
+						<div
+							class="filter-section-header"
+							onclick="toggleFilterSection('fbaFee')"
+						>
+							<span>FBA Fee</span>
+							<svg
+								class="filter-arrow"
+								width="12"
+								height="12"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+							>
+								<polyline points="6,9 12,15 18,9"></polyline>
+							</svg>
+						</div>
+						<div
+							id="fbaFeeFilterContent"
+							class="filter-section-content"
+						>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="fbaFeeFilter"
+									value="all"
+									checked
+								/>
+								<span>All</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="fbaFeeFilter"
+									value="0-5"
+								/>
+								<span>$0 - $5</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="fbaFeeFilter"
+									value="5-10"
+								/>
+								<span>$5 - $10</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="fbaFeeFilter"
+									value="10-20"
+								/>
+								<span>$10 - $20</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="fbaFeeFilter"
+									value="20+"
+								/>
+								<span>$20+</span>
+							</label>
+						</div>
+					</div>
+
+					<!-- Price Filter -->
+					<div class="filter-section">
+						<div
+							class="filter-section-header"
+							onclick="toggleFilterSection('price')"
+						>
+							<span>Price</span>
+							<svg
+								class="filter-arrow"
+								width="12"
+								height="12"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+							>
+								<polyline points="6,9 12,15 18,9"></polyline>
+							</svg>
+						</div>
+						<div
+							id="priceFilterContent"
+							class="filter-section-content"
+						>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="priceFilter"
+									value="all"
+									checked
+								/>
+								<span>All</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="priceFilter"
+									value="0-10"
+								/>
+								<span>$0 - $10</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="priceFilter"
+									value="10-25"
+								/>
+								<span>$10 - $25</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="priceFilter"
+									value="25-50"
+								/>
+								<span>$25 - $50</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="priceFilter"
+									value="50-100"
+								/>
+								<span>$50 - $100</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="priceFilter"
+									value="100+"
+								/>
+								<span>$100+</span>
+							</label>
+						</div>
+					</div>
+
+					<!-- Referral Fee Filter -->
+					<div class="filter-section">
+						<div
+							class="filter-section-header"
+							onclick="toggleFilterSection('referralFee')"
+						>
+							<span>Referral Fee</span>
+							<svg
+								class="filter-arrow"
+								width="12"
+								height="12"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+							>
+								<polyline points="6,9 12,15 18,9"></polyline>
+							</svg>
+						</div>
+						<div
+							id="referralFeeFilterContent"
+							class="filter-section-content"
+						>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="referralFeeFilter"
+									value="all"
+									checked
+								/>
+								<span>All</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="referralFeeFilter"
+									value="0-2"
+								/>
+								<span>$0 - $2</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="referralFeeFilter"
+									value="2-5"
+								/>
+								<span>$2 - $5</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="referralFeeFilter"
+									value="5-10"
+								/>
+								<span>$5 - $10</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="referralFeeFilter"
+									value="10+"
+								/>
+								<span>$10+</span>
+							</label>
+						</div>
+					</div>
+
+					<!-- Review Rating Filter -->
+					<div class="filter-section">
+						<div
+							class="filter-section-header"
+							onclick="toggleFilterSection('rating')"
+						>
+							<span>Review Rating</span>
+							<svg
+								class="filter-arrow"
+								width="12"
+								height="12"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+							>
+								<polyline points="6,9 12,15 18,9"></polyline>
+							</svg>
+						</div>
+						<div
+							id="ratingFilterContent"
+							class="filter-section-content"
+						>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="ratingFilter"
+									value="all"
+									checked
+								/>
+								<span>All</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="ratingFilter"
+									value="4.5+"
+								/>
+								<span>4.5+ ⭐</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="ratingFilter"
+									value="4.0+"
+								/>
+								<span>4.0+ ⭐</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="ratingFilter"
+									value="3.5+"
+								/>
+								<span>3.5+ ⭐</span>
+							</label>
+							<label class="filter-option">
+								<input
+									type="radio"
+									name="ratingFilter"
+									value="3.0+"
+								/>
+								<span>3.0+ ⭐</span>
+							</label>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<div class="filter-panel-footer">
+				<button class="reset-filters-btn" onclick="resetAllFilters()">
+					Reset
+				</button>
+				<button class="apply-filters-btn" onclick="applyAllFilters()">
+					Apply
+				</button>
+			</div>
+		</div>
+
+		<!-- Confirmation Modal -->
+		<div id="deleteModal" class="modal">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h2>Confirm Deletion</h2>
+					<span class="close-modal">&times;</span>
+				</div>
+				<div class="modal-body">
+					<p>Are you sure you want to delete this product?</p>
+					<p id="deleteProductName" style="font-weight: bold"></p>
+				</div>
+				<div class="modal-footer">
+					<button
+						class="modal-btn modal-btn-cancel"
+						id="cancelDelete"
+					>
+						Cancel
+					</button>
+					<button
+						class="modal-btn modal-btn-delete"
+						id="confirmDelete"
+					>
+						Delete
+					</button>
+				</div>
+			</div>
+		</div>
+	</body>
+	<script>
+		// Load environment variables from server
+		fetch('/api/config')
+			.then((response) => response.json())
+			.then((config) => {
+				window.API_BASE_URL = config.API_BASE_URL || '';
+				console.log('Config loaded:', config);
+			})
+			.catch((error) => {
+				console.error('Failed to load config:', error);
+				window.API_BASE_URL = '';
+			});
+	</script>
+	<script src="/dashboard/dashboard.js"></script>
+</html>
