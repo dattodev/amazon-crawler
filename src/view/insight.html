@@ -433,6 +433,25 @@
 				return Math.trunc(value * factor) / factor;
 			}
 
+			// Helpers for compact formatting (Sales, Revenue)
+			function formatCompactUnits(val) {
+				const n = Number(val);
+				if (!isFinite(n)) return '';
+				if (Math.abs(n) >= 1000000)
+					return `${(n / 1000000).toFixed(2)}M`;
+				if (Math.abs(n) >= 1000) return `${(n / 1000).toFixed(1)}k`;
+				return `${n.toFixed(0)}`;
+			}
+
+			function formatCompactUSD(val) {
+				const n = Number(val);
+				if (!isFinite(n)) return '';
+				if (Math.abs(n) >= 1000000)
+					return `$${(n / 1000000).toFixed(2)}M`;
+				if (Math.abs(n) >= 1000) return `$${(n / 1000).toFixed(2)}k`;
+				return `$${n.toFixed(2)}`;
+			}
+
 			function formatMetricValue(metricCode, val, unit) {
 				if (val == null || isNaN(val)) return '';
 				// Do NOT round or compact for Avg. Reviews and Avg. Rating
@@ -442,6 +461,13 @@
 					unit === 'count'
 				) {
 					return String(val);
+				}
+				// Special compact rules
+				if (metricCode === 'sales_units') {
+					return formatCompactUnits(Number(val));
+				}
+				if (metricCode === 'revenue') {
+					return formatCompactUSD(Number(val));
 				}
 				if (metricCode === 'fba_fee' || metricCode === 'referral_fee') {
 					const v = truncateDecimals(Number(val), 2);
