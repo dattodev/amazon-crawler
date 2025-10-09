@@ -410,19 +410,14 @@
 			function formatValue(val, unit) {
 				if (val == null || isNaN(val)) return '';
 				if (unit === 'usd') {
-					if (val >= 1000000)
-						return `$${(val / 1000000).toFixed(0)}m`;
-					if (val >= 1000) return `$${(val / 1000).toFixed(0)}k`;
-					return `$${Number(val).toFixed(0)}`;
+					return `$${Number(val).toFixed(2)}`;
 				}
 				if (unit === 'units' || unit === 'count') {
-					if (val >= 1000000) return `${(val / 1000000).toFixed(0)}m`;
-					if (val >= 1000) return `${(val / 1000).toFixed(0)}k`;
 					return `${Number(val).toFixed(0)}`;
 				}
 				if (unit === 'pct') {
 					const pct = val < 1 ? val * 100 : val;
-					const digits = pct < 10 ? 2 : 0;
+					const digits = 2;
 					return `${Number(pct).toFixed(digits)}%`;
 				}
 				if (unit === 'ratio') {
@@ -440,6 +435,14 @@
 
 			function formatMetricValue(metricCode, val, unit) {
 				if (val == null || isNaN(val)) return '';
+				// Do NOT round or compact for Avg. Reviews and Avg. Rating
+				if (
+					(metricCode === 'avg_ratings' ||
+						metricCode === 'avg_rating') &&
+					unit === 'count'
+				) {
+					return String(val);
+				}
 				if (metricCode === 'fba_fee' || metricCode === 'referral_fee') {
 					const v = truncateDecimals(Number(val), 2);
 					return `$${v}`;
