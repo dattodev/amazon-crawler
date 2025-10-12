@@ -14,10 +14,14 @@
 
 		<style>
 			:root {
-				--heatmap-green: #badc58;
-				--heatmap-red: #ff6b6b;
-				--heatmap-yellow: #feca57;
+				--heatmap-green: #22c55e;
+				--heatmap-red: #ef4444;
+				--heatmap-yellow: #facc15;
 				--heatmap-orange: #ff9f43;
+				--primary-orange: #ff7a00;
+				--primary-orange-hover: #e66a00;
+				--primary-orange-light: #fff4e6;
+				--heatmap-text: #111;
 			}
 
 			input,
@@ -54,7 +58,7 @@
 				margin: 0 0 8px 0;
 				font-size: 18px;
 				font-weight: 600;
-				color: #333;
+				color: var(--primary-orange);
 			}
 
 			.sidebar-stats {
@@ -69,20 +73,20 @@
 			.manage-categories-link {
 				display: inline-block;
 				padding: 8px 16px;
-				background: #2196f3;
+				background: var(--primary-orange);
 				color: white;
 				text-decoration: none;
 				border-radius: 6px;
 				font-size: 13px;
 				font-weight: 500;
 				transition: all 0.2s ease;
-				box-shadow: 0 2px 4px rgba(33, 150, 243, 0.2);
+				box-shadow: 0 2px 4px rgba(255, 122, 0, 0.2);
 			}
 
 			.manage-categories-link:hover {
-				background: #1976d2;
+				background: var(--primary-orange-hover);
 				transform: translateY(-1px);
-				box-shadow: 0 4px 8px rgba(33, 150, 243, 0.3);
+				box-shadow: 0 4px 8px rgba(255, 122, 0, 0.3);
 			}
 
 			.sidebar-content {
@@ -94,42 +98,173 @@
 				padding: 8px;
 			}
 
+			/* Search box */
+			.category-search {
+				margin-bottom: 12px;
+			}
+
+			.category-search input {
+				width: 100%;
+				padding: 8px 12px;
+				border: 1px solid #e0e0e0;
+				border-radius: 6px;
+				font-size: 13px;
+				background: #fafafa;
+				transition: all 0.2s ease;
+			}
+
+			.category-search input:focus {
+				outline: none;
+				border-color: var(--primary-orange);
+				background: white;
+				box-shadow: 0 0 0 2px rgba(255, 122, 0, 0.1);
+			}
+
+			/* All/Clear controls */
+			.category-controls {
+				display: flex;
+				align-items: center;
+				gap: 8px;
+				margin-bottom: 12px;
+				padding: 8px 0;
+				border-bottom: 1px solid #f0f0f0;
+			}
+
+			.category-controls .checkbox-wrapper {
+				display: flex;
+				align-items: center;
+				gap: 6px;
+				cursor: pointer;
+				user-select: none;
+			}
+
+			.category-controls .checkbox-wrapper input[type='checkbox'] {
+				width: 16px;
+				height: 16px;
+				accent-color: var(--primary-orange);
+				cursor: pointer;
+				appearance: none;
+				-webkit-appearance: none;
+				-moz-appearance: none;
+				border: 2px solid #ddd;
+				border-radius: 3px;
+				background: white;
+				position: relative;
+			}
+
+			.category-controls
+				.checkbox-wrapper
+				input[type='checkbox']:checked {
+				background: var(--primary-orange);
+				border-color: var(--primary-orange);
+			}
+
+			.category-controls
+				.checkbox-wrapper
+				input[type='checkbox']:checked::after {
+				content: '✓';
+				position: absolute;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				color: white;
+				font-size: 12px;
+				font-weight: bold;
+			}
+
+			.category-controls .checkbox-wrapper label {
+				font-size: 13px;
+				font-weight: 500;
+				color: var(--primary-orange);
+				cursor: pointer;
+				margin: 0;
+			}
+
+			.category-controls .clear-btn {
+				margin-left: auto;
+				padding: 4px 8px;
+				background: none;
+				border: 1px solid #e0e0e0;
+				border-radius: 4px;
+				font-size: 12px;
+				color: #666;
+				cursor: pointer;
+				transition: all 0.2s ease;
+			}
+
+			.category-controls .clear-btn:hover {
+				background: #f5f5f5;
+				border-color: var(--primary-orange);
+				color: var(--primary-orange);
+			}
+
+			/* Category items with checkboxes */
 			.category-item {
-				padding: 12px 16px;
-				margin: 4px 0;
-				border-radius: 8px;
+				padding: 8px 12px;
+				margin: 2px 0;
+				border-radius: 6px;
 				cursor: pointer;
 				transition: all 0.2s ease;
 				border: 1px solid transparent;
 				display: flex;
 				align-items: center;
-				justify-content: space-between;
+				gap: 8px;
 			}
 
 			.category-item:hover {
-				background: #f8f9fa;
-				border-color: #e0e0e0;
+				background: var(--primary-orange-light);
+				border-color: rgba(255, 122, 0, 0.2);
 			}
 
 			.category-item.selected {
-				background: #e3f2fd;
-				border-color: #2196f3;
-				color: #1976d2;
+				background: var(--primary-orange-light);
+				border-color: var(--primary-orange);
+			}
+
+			.category-item input[type='checkbox'] {
+				width: 16px;
+				height: 16px;
+				accent-color: var(--primary-orange);
+				cursor: pointer;
+				flex-shrink: 0;
+				appearance: none;
+				-webkit-appearance: none;
+				-moz-appearance: none;
+				border: 2px solid #ddd;
+				border-radius: 3px;
+				background: white;
+				position: relative;
+			}
+
+			.category-item input[type='checkbox']:checked {
+				background: var(--primary-orange);
+				border-color: var(--primary-orange);
+			}
+
+			.category-item input[type='checkbox']:checked::after {
+				content: '✓';
+				position: absolute;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				color: white;
+				font-size: 12px;
+				font-weight: bold;
 			}
 
 			.category-item .category-name {
 				font-weight: 500;
 				font-size: 14px;
+				color: #333;
+				flex: 1;
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				max-width: 180px;
 			}
 
-			.category-item .category-stats {
-				font-size: 11px;
-				color: #666;
-				opacity: 0.8;
-			}
-
-			.category-item.selected .category-stats {
-				color: #1976d2;
+			.category-item.selected .category-name {
+				color: var(--primary-orange);
 			}
 
 			/* Main Content */
@@ -144,7 +279,7 @@
 				padding: 10px;
 				background-color: white;
 				display: flex;
-				justify-content: space-between;
+				justify-content: flex-end;
 				align-items: center;
 				border: 1px solid #ccc;
 				border-radius: 8px;
@@ -157,6 +292,7 @@
 				border: 1px solid #ccc;
 				outline: none;
 				border-radius: 8px;
+				display: none;
 			}
 
 			.date-filter select,
@@ -210,9 +346,9 @@
 			}
 
 			.metric-item.selected {
-				background-color: #2278d0;
+				background-color: var(--primary-orange);
 				color: #fff;
-				border-color: #2278d0;
+				border-color: var(--primary-orange);
 			}
 
 			.metric-item span {
@@ -248,23 +384,80 @@
 			}
 
 			.heatmap-table-body {
-				/* box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); */
 				border: 1px solid #e0e0e0;
-				border-radius: 12px;
+				border-radius: 8px;
 				background-color: #fff;
-				font-size: 14px;
+				font-size: 13px;
 				overflow: hidden;
 				margin-top: 20px;
 			}
-			/* Rows */
-			.heatmap-table-row {
-				border-bottom: 1px solid #f0f0f0;
+
+			/* Grid layout for heatmap */
+			.heatmap-grid {
+				display: grid;
+				border-collapse: collapse;
 			}
-			.heatmap-table-row:last-child {
-				border-bottom: none;
+
+			.heatmap-cell {
+				padding: 8px;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				min-height: 32px;
+				text-align: center;
 			}
-			.heatmap-table-row:hover {
-				background: #fdfdfd;
+
+			.heatmap-cell.header {
+				background: #f8f9fa;
+				font-weight: 600;
+				color: #333;
+				justify-content: center;
+			}
+
+			.heatmap-cell.category {
+				font-weight: 600;
+				color: #333;
+				justify-content: start;
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				gap: 10px;
+			}
+
+			.heatmap-cell.metric {
+				font-weight: 500;
+				color: #444;
+				justify-content: center;
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+
+			/* Zebra striping for entire rows */
+			.heatmap-grid:nth-child(even) .heatmap-cell {
+				background: #f8f9fa;
+			}
+
+			.heatmap-grid:nth-child(odd) .heatmap-cell {
+				background: #ffffff;
+			}
+
+			/* Keep header background separate */
+			.heatmap-grid:first-child .heatmap-cell {
+				background: #eee !important;
+				min-height: 40px;
+			}
+
+			.heatmap-value {
+				display: inline-block;
+				padding: 4px 8px;
+				border-radius: 4px;
+				font-weight: 600;
+				font-size: 12px;
+				min-width: 50px;
+				text-align: center;
+				width: 100%;
+				text-transform: uppercase;
 			}
 		</style>
 	</head>
@@ -284,8 +477,34 @@
 					</div>
 				</div>
 				<div class="sidebar-content">
-					<div id="categoryList" class="category-list">
-						<!-- Categories will be loaded here -->
+					<div class="category-list">
+						<!-- Search box -->
+						<div class="category-search">
+							<input
+								id="categorySearchInput"
+								type="text"
+								placeholder="Search categories..."
+							/>
+						</div>
+
+						<!-- All/Clear controls -->
+						<div class="category-controls">
+							<div class="checkbox-wrapper">
+								<input
+									id="selectAllCategories"
+									type="checkbox"
+								/>
+								<label for="selectAllCategories">All</label>
+							</div>
+							<button class="clear-btn" id="clearAllCategories">
+								Clear
+							</button>
+						</div>
+
+						<!-- Categories list -->
+						<div id="categoryList">
+							<!-- Categories will be loaded here -->
+						</div>
 					</div>
 				</div>
 			</div>
@@ -481,7 +700,7 @@
 			function mapMetricColor(metricCode, value, columnValues) {
 				// If no value or no data, return gray
 				if (value == null || isNaN(value)) {
-					return { bg: '#f5f5f5', fg: '#666666' };
+					return { bg: '#f5f5f5', fg: 'var(--heatmap-text)' };
 				}
 
 				// Define metric types
@@ -517,7 +736,7 @@
 
 				// For neutral metrics, always return gray
 				if (NEUTRAL.includes(metricCode)) {
-					return { bg: '#e8e8e8', fg: '#666666' };
+					return { bg: '#e8e8e8', fg: 'var(--heatmap-text)' };
 				}
 
 				// Get min and max values from this specific column (month)
@@ -525,7 +744,7 @@
 					(v) => typeof v === 'number' && !isNaN(v)
 				);
 				if (validValues.length === 0) {
-					return { bg: '#f5f5f5', fg: '#666666' };
+					return { bg: '#f5f5f5', fg: 'var(--heatmap-text)' };
 				}
 
 				const minValue = Math.min(...validValues);
@@ -533,7 +752,7 @@
 
 				// If all values are the same, return neutral color
 				if (minValue === maxValue) {
-					return { bg: '#e8e8e8', fg: '#666666' };
+					return { bg: '#e8e8e8', fg: 'var(--heatmap-text)' };
 				}
 
 				// Calculate percentile ranges for this column
@@ -550,42 +769,42 @@
 					if (value <= p25) {
 						// Bottom 25% - Red (worst)
 						bg = 'var(--heatmap-red)';
-						fg = '#ffffff';
+						fg = 'var(--heatmap-text)';
 					} else if (value <= p50) {
 						// 25-50% - Orange
 						bg = 'var(--heatmap-orange)';
-						fg = '#ffffff';
+						fg = 'var(--heatmap-text)';
 					} else if (value <= p75) {
 						// 50-75% - Yellow
 						bg = 'var(--heatmap-yellow)';
-						fg = '#0d0d0d';
+						fg = 'var(--heatmap-text)';
 					} else {
 						// Top 25% - Green (best)
 						bg = 'var(--heatmap-green)';
-						fg = '#0d0d0d';
+						fg = 'var(--heatmap-text)';
 					}
 				} else if (LOWER_IS_BETTER.includes(metricCode)) {
 					// Lower is better: Green = low, Red = high
 					if (value <= p25) {
 						// Bottom 25% - Green (best)
 						bg = 'var(--heatmap-green)';
-						fg = '#0d0d0d';
+						fg = 'var(--heatmap-text)';
 					} else if (value <= p50) {
 						// 25-50% - Yellow
 						bg = 'var(--heatmap-yellow)';
-						fg = '#0d0d0d';
+						fg = 'var(--heatmap-text)';
 					} else if (value <= p75) {
 						// 50-75% - Orange
 						bg = 'var(--heatmap-orange)';
-						fg = '#ffffff';
+						fg = 'var(--heatmap-text)';
 					} else {
 						// Top 25% - Red (worst)
 						bg = 'var(--heatmap-red)';
-						fg = '#ffffff';
+						fg = 'var(--heatmap-text)';
 					}
 				} else {
 					// Default to neutral gray for unknown metrics
-					return { bg: '#e8e8e8', fg: '#666666' };
+					return { bg: '#e8e8e8', fg: 'var(--heatmap-text)' };
 				}
 
 				return { bg, fg };
@@ -696,15 +915,15 @@
 
 				// No extra Top10 column
 
-				const gridCols = `220px 160px repeat(${buckets.length}, 120px)`;
+				const gridCols = `200px 300px repeat(${buckets.length}, 1fr)`;
 				const header = [
-					`<div style=\"position:sticky;top:0;z-index:2;background:#f8f9fa;display:grid;grid-template-columns:${gridCols};border-bottom:2px solid #e0e0e0;\" >`,
-					'<div style="font-weight:700;padding:16px 20px;color:#333;border-right:1px solid #e0e0e0">Category</div>',
-					'<div style="font-weight:700;padding:16px 20px;color:#333;border-right:1px solid #e0e0e0">Metric</div>',
+					`<div class="heatmap-grid" style="grid-template-columns:${gridCols};position:sticky;top:0;z-index:2;">`,
+					'<div class="heatmap-cell header">Category</div>',
+					'<div class="heatmap-cell header">Metric</div>',
 					buckets
 						.map(
 							(b) =>
-								`<div style=\"font-weight:700;padding:16px 8px;text-align:center;color:#333;border-right:1px solid #e0e0e0\">${bucketLabel(
+								`<div class="heatmap-cell header">${bucketLabel(
 									b
 								)}</div>`
 						)
@@ -894,7 +1113,59 @@
 					valuesByCategoryAndMetric[categoryId] = rowStore;
 				});
 
-				selectedCategories.forEach((categoryId) => {
+				// Sort categories based on selected metrics
+				const sortedCategoryIds = Array.from(selectedCategories).sort(
+					(a, b) => {
+						const dataA = allCategoryData.get(a);
+						const dataB = allCategoryData.get(b);
+
+						if (!dataA || !dataB) return 0;
+
+						// Get the primary metric to sort by
+						const primaryMetric = selectedDefs[0]; // First selected metric
+						if (!primaryMetric) return 0;
+
+						// Get latest value for primary metric
+						const getLatestValue = (data, metricCode) => {
+							const byMetric = {};
+							(data.timeSeriesData || []).forEach(
+								(m) => (byMetric[m.metric] = m)
+							);
+
+							const metricData = byMetric[metricCode];
+							if (!metricData || !metricData.timeSeries)
+								return null;
+
+							// Find latest month value
+							const latestMonth = metricData.timeSeries
+								.filter((ts) => /^\d{4}-\d{2}$/.test(ts.bucket))
+								.sort((a, b) =>
+									b.bucket.localeCompare(a.bucket)
+								)[0];
+
+							return latestMonth ? latestMonth.value : null;
+						};
+
+						const valueA = getLatestValue(
+							dataA,
+							primaryMetric.code
+						);
+						const valueB = getLatestValue(
+							dataB,
+							primaryMetric.code
+						);
+
+						// Handle null values
+						if (valueA == null && valueB == null) return 0;
+						if (valueA == null) return 1; // null values go to bottom
+						if (valueB == null) return -1;
+
+						// Sort descending (high to low)
+						return valueB - valueA;
+					}
+				);
+
+				sortedCategoryIds.forEach((categoryId) => {
 					const data = allCategoryData.get(categoryId);
 					if (!data) return;
 
@@ -1036,7 +1307,7 @@
 									v,
 									def.unit
 								);
-								return `<div style=\"padding:12px 8px;text-align:center;display:flex;justify-content:center;align-items:center;\"><span style=\"display:inline-block;padding:8px 16px;border-radius:8px;background:${bg};color:${fg};width: 100%;font-weight:600;font-size:13px;min-width:60px;text-align:center;text-transform: uppercase;border: 1px solid ${bg}\">${
+								return `<div class="heatmap-cell"><span class="heatmap-value" style="background:${bg};color:${fg};border: 1px solid ${bg}">${
 									label || '-'
 								}</span></div>`;
 							})
@@ -1045,23 +1316,17 @@
 						// Category name only on first metric row
 						const firstCol =
 							index === 0
-								? `<div style=\"padding:10px 20px;color:#333;font-weight:700;border-right:1px solid #e0e0e0;background:white\">${
+								? `<div class="heatmap-cell category">${
 										data.category?.name || ''
-								  }<div style=\"color:#999;font-size:12px;font-weight:500;margin-top:4px\">${availableCount} metric${
+								  }<div style="color:#999;font-size:11px;font-weight:400;margin-top:2px">${availableCount} metric${
 										availableCount === 1 ? '' : 's'
 								  }</div></div>`
-								: '<div style="border-right:1px solid #e0e0e0;background:white"></div>';
-
-						// No internal borders between metrics of same category
-						const borderBottom =
-							index === selectedDefs.length - 1
-								? 'border-bottom:1px solid #e0e0e0'
-								: 'border-bottom:none';
+								: '<div class="heatmap-cell"></div>';
 
 						categoryGroupRows.push(
-							`<div style=\"display:grid;grid-template-columns:${gridCols};background:white;${borderBottom}\">` +
+							`<div class="heatmap-grid" style="grid-template-columns:${gridCols};">` +
 								firstCol +
-								`<div style=\"padding:10px;color:#444;font-weight:600;border-right:1px solid #e0e0e0;background:white;display:flex;align-items:center;justify-content:start\">${def.name}</div>` +
+								`<div class="heatmap-cell metric">${def.name}</div>` +
 								cells +
 								'</div>'
 						);
@@ -1124,18 +1389,32 @@
 					div.className = 'category-item';
 					div.dataset.categoryId = category._id;
 
+					const isSelected = selectedCategories.has(category._id);
+					if (isSelected) {
+						div.classList.add('selected');
+					}
+
 					div.innerHTML = `
-						<div class="category-name">${
-							category.name.length > 12
-								? category.name.substring(0, 12) + '...'
-								: category.name
-						}</div>
-						<div class="category-stats">Click to add</div>
+						<input
+							type="checkbox"
+							${isSelected ? 'checked' : ''}
+							onchange="toggleCategory('${category._id}')"
+						/>
+						<div class="category-name" title="${category.name}">${category.name}</div>
 					`;
 
-					div.onclick = () => toggleCategory(category._id);
+					// Also handle click on the entire item
+					div.onclick = (e) => {
+						if (e.target.type !== 'checkbox') {
+							toggleCategory(category._id);
+						}
+					};
+
 					container.appendChild(div);
 				});
+
+				// Update select all checkbox state
+				updateSelectAllState();
 			}
 
 			async function selectOnlyCategory(categoryId) {
@@ -1159,6 +1438,7 @@
 					}
 					updateCategorySelection();
 					updateSelectedCount();
+					updateSelectAllState();
 					renderHeatmap();
 				} catch (e) {
 					console.error('Failed to select only category:', e);
@@ -1208,20 +1488,23 @@
 				// Update UI
 				updateCategorySelection();
 				updateSelectedCount();
+				updateSelectAllState();
 				renderHeatmap();
 			}
 
 			function updateCategorySelection() {
 				document.querySelectorAll('.category-item').forEach((item) => {
 					const categoryId = item.dataset.categoryId;
+					const checkbox = item.querySelector(
+						'input[type="checkbox"]'
+					);
+
 					if (selectedCategories.has(categoryId)) {
 						item.classList.add('selected');
-						item.querySelector('.category-stats').textContent =
-							'Selected';
+						if (checkbox) checkbox.checked = true;
 					} else {
 						item.classList.remove('selected');
-						item.querySelector('.category-stats').textContent =
-							'Click to add';
+						if (checkbox) checkbox.checked = false;
 					}
 				});
 			}
@@ -1229,6 +1512,77 @@
 			function updateSelectedCount() {
 				document.getElementById('selectedCount').textContent =
 					selectedCategories.size;
+			}
+
+			function updateSelectAllState() {
+				const selectAllCheckbox = document.getElementById(
+					'selectAllCategories'
+				);
+				if (!selectAllCheckbox) return;
+
+				const visibleCategories = Array.from(
+					document.querySelectorAll('.category-item')
+				).map((item) => item.dataset.categoryId);
+
+				const selectedVisible = visibleCategories.filter((id) =>
+					selectedCategories.has(id)
+				);
+
+				if (selectedVisible.length === 0) {
+					selectAllCheckbox.checked = false;
+					selectAllCheckbox.indeterminate = false;
+				} else if (
+					selectedVisible.length === visibleCategories.length
+				) {
+					selectAllCheckbox.checked = true;
+					selectAllCheckbox.indeterminate = false;
+				} else {
+					selectAllCheckbox.checked = false;
+					selectAllCheckbox.indeterminate = true;
+				}
+			}
+
+			async function selectAllCategories() {
+				const visibleCategories = Array.from(
+					document.querySelectorAll('.category-item')
+				).map((item) => item.dataset.categoryId);
+
+				for (const categoryId of visibleCategories) {
+					if (!selectedCategories.has(categoryId)) {
+						selectedCategories.add(categoryId);
+						// Load category data if not already loaded
+						if (!allCategoryData.has(categoryId)) {
+							try {
+								const r = await fetch(
+									`/api/research/category/${categoryId}`
+								);
+								if (r.ok) {
+									const data = await r.json();
+									allCategoryData.set(categoryId, data);
+								}
+							} catch (e) {
+								console.error(
+									'Failed to load category data:',
+									e
+								);
+							}
+						}
+					}
+				}
+
+				updateCategorySelection();
+				updateSelectedCount();
+				updateSelectAllState();
+				renderHeatmap();
+			}
+
+			function clearAllCategories() {
+				selectedCategories.clear();
+				allCategoryData.clear();
+				updateCategorySelection();
+				updateSelectedCount();
+				updateSelectAllState();
+				renderHeatmap();
 			}
 
 			async function loadCategory() {
@@ -1241,7 +1595,7 @@
 			loadCategory();
 
 			// Search wiring
-			const searchInput = document.getElementById('categorySearch');
+			const searchInput = document.getElementById('categorySearchInput');
 			if (searchInput) {
 				if (!searchInput.__bound) {
 					searchInput.addEventListener('input', (e) => {
@@ -1267,6 +1621,28 @@
 					});
 					searchInput.__bound = true;
 				}
+			}
+
+			// Select All checkbox wiring
+			const selectAllCheckbox = document.getElementById(
+				'selectAllCategories'
+			);
+			if (selectAllCheckbox) {
+				selectAllCheckbox.addEventListener('change', async (e) => {
+					if (e.target.checked) {
+						await selectAllCategories();
+					} else {
+						clearAllCategories();
+					}
+				});
+			}
+
+			// Clear All button wiring
+			const clearAllBtn = document.getElementById('clearAllCategories');
+			if (clearAllBtn) {
+				clearAllBtn.addEventListener('click', () => {
+					clearAllCategories();
+				});
 			}
 
 			const monthsSelect = document.getElementById('monthsFilter');

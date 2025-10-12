@@ -663,6 +663,45 @@ h1 {
     border-bottom: 2px solid var(--light-gray);
 }
 
+/* Category Insight Action Button */
+.category-insight-action {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--light-gray);
+}
+
+.view-insight-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(239, 108, 0, 0.2);
+}
+
+.view-insight-btn:hover {
+    background: #d84315;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(239, 108, 0, 0.3);
+}
+
+.insight-icon {
+    font-size: 16px;
+}
+
+.insight-text {
+    font-weight: 600;
+}
+
 .filter-options {
     display: flex;
     flex-direction: column;
