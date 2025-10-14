@@ -1024,6 +1024,7 @@ async function handleAdsMetricsSheet(dataset, rows, header, res) {
 	try {
 		// Determine the actual header row: some sheets put values ABOVE the header labels
 		const EXPECTED_COL_KEYS = [
+			// direct ads metrics
 			'ctr',
 			'cpc',
 			'roas',
@@ -1031,7 +1032,16 @@ async function handleAdsMetricsSheet(dataset, rows, header, res) {
 			'acos',
 			'tacos',
 			'cpp',
+			'click share',
 			'clickshare',
+			// raw columns used to compute category metrics
+			'clicks',
+			'impressions',
+			'monthly sales',
+			'monthly searches',
+			'ppc bid',
+			'avg price',
+			'price',
 		];
 		let headerRowIdx = 0;
 		let bestMatch = -1;
@@ -1053,15 +1063,18 @@ async function handleAdsMetricsSheet(dataset, rows, header, res) {
 		const valueRowAbove = headerRowIdx > 0 ? rows[headerRowIdx - 1] : null;
 
 		// Find columns by name patterns (case-insensitive) using detected header
+		const normalize = (s) =>
+			String(s || '')
+				.toLowerCase()
+				.replace(/[^a-z0-9%]+/g, ' ') // collapse punctuation
+				.replace(/\s+/g, ' ')
+				.trim();
+		const hdrNorm = hdr.map((h) => normalize(h));
 		const findColumnIndex = (patterns) => {
-			return hdr.findIndex((h) => {
-				const colName = String(h || '')
-					.toLowerCase()
-					.trim();
-				return patterns.some((pattern) =>
-					colName.includes(pattern.toLowerCase())
-				);
-			});
+			const pats = patterns.map((p) => normalize(p));
+			return hdrNorm.findIndex((col) =>
+				pats.some((p) => col.includes(p))
+			);
 		};
 
 		// Find CTR column
@@ -1079,30 +1092,345 @@ async function handleAdsMetricsSheet(dataset, rows, header, res) {
 		// Find CPP column
 		const cppIdx = findColumnIndex(['cpp']);
 
-		// Check if we have at least some of the required columns
-		const hasRequiredColumns = [
-			ctrIdx,
-			cpcIdx,
-			roasIdx,
-			crIdx,
-			acosIdx,
-			tacosIdx,
-			cppIdx,
-		].some((idx) => idx >= 0);
-
-		if (!hasRequiredColumns) {
-			return res.status(400).json({
-				error: 'No ads metrics columns found. Expected: CTR, CPC, ROAS, CR, ACOS, TACOS, CPP',
-			});
-		}
+		// We allow proceeding even if direct metric columns are missing; raw columns path handles computation
 
 		const docs = [];
 		let processedRows = 0;
 
 		// Decide which rows to process: if values are above the header, use that single row
-		const rowsToProcess = valueRowAbove
-			? [valueRowAbove]
-			: rows.slice(headerRowIdx + 1);
+		// Prefer data rows below header; include row above only if it contains numeric values in any detected column
+		let rowsToProcess = rows.slice(headerRowIdx + 1);
+		if (valueRowAbove) {
+			const rowHasNumbers = (arr) =>
+				(arr || []).some((x) => {
+					if (x == null || x === '') return false;
+					const s = String(x).replace(/[^0-9.\-]/g, '');
+					return s.length && isFinite(Number(s));
+				});
+			if (rowHasNumbers(valueRowAbove)) {
+				rowsToProcess = [valueRowAbove];
+			}
+		}
+
+		// New category-level computation path using raw columns (expanded aliases)
+		const clicksIdx = findColumnIndex([
+			'clicks',
+			'total clicks',
+			'sum clicks',
+			'click count',
+			'no clicks',
+			'click',
+		]);
+		const impressionsIdx = findColumnIndex([
+			'impressions',
+			'impr',
+			'impression',
+			'imprs',
+			'total impressions',
+		]);
+		const monthlySalesIdx = findColumnIndex([
+			'monthly sales',
+			'sales',
+			'orders',
+			'order',
+			'purchase',
+			'purchases',
+			'sales units',
+		]);
+		const monthlySearchesIdx = findColumnIndex([
+			'monthly searches',
+			'searches',
+			'keyword searches',
+			'search volume',
+			'volume',
+			'sv',
+		]);
+		const bidIdx = findColumnIndex([
+			'ppc bid',
+			'bid',
+			'cpc bid',
+			'avg cpc bid',
+			'bid ($)',
+			'suggested bid',
+		]);
+		const clickShareIdx = findColumnIndex([
+			'click share %',
+			'click share',
+			'clickshare',
+			'clicks share',
+			'click share pct',
+			'click share percent',
+		]);
+		const avgPriceIdx = findColumnIndex([
+			'avg price',
+			'avg. price',
+			'average price',
+			'price avg',
+			'avg price ($)',
+			'avg price usd',
+			'average price ($)',
+		]);
+
+		if (clicksIdx >= 0) {
+			let sumClicks = 0;
+			let sumImpr = 0;
+			let sumSales = 0;
+			let sumSearches = 0;
+			let sumProdBidClicks = 0;
+			let sumClickShareWeighted = 0;
+			let sumAvgPrice = 0;
+			let cntAvgPrice = 0;
+
+			for (const row of rowsToProcess) {
+				if (!row) continue;
+				const read = (idx, perc = false) => {
+					if (idx < 0) return null;
+					let v = row[idx];
+					if (v == null || v === '') return null;
+					if (typeof v === 'string') v = v.replace(/[$,\s%]/g, '');
+					v = Number(v);
+					if (!isFinite(v)) return null;
+					return perc ? (v > 1 ? v / 100 : v) : v;
+				};
+
+				const clicks = read(clicksIdx) || 0;
+				const impr =
+					impressionsIdx >= 0 ? read(impressionsIdx) || 0 : 0;
+				const sales =
+					monthlySalesIdx >= 0 ? read(monthlySalesIdx) || 0 : 0;
+				const searches =
+					monthlySearchesIdx >= 0 ? read(monthlySearchesIdx) || 0 : 0;
+				const bid = bidIdx >= 0 ? read(bidIdx) || 0 : 0;
+				const clickShare =
+					clickShareIdx >= 0 ? read(clickShareIdx, true) || 0 : 0; // fraction
+				const avgPrice = avgPriceIdx >= 0 ? read(avgPriceIdx) : null;
+
+				sumClicks += clicks;
+				sumImpr += impr;
+				sumSales += sales;
+				sumSearches += searches;
+				sumProdBidClicks += bid * clicks;
+				sumClickShareWeighted += (clickShare || 0) * clicks; // iferror-style handling
+				if (avgPrice != null) {
+					sumAvgPrice += avgPrice;
+					cntAvgPrice += 1;
+				}
+			}
+
+			const ctrCat = sumImpr > 0 ? sumClicks / sumImpr : null;
+			const crCat = sumSearches > 0 ? sumSales / sumSearches : null;
+			const cpcCat = sumClicks > 0 ? sumProdBidClicks / sumClicks : null;
+			let avgPriceCat =
+				cntAvgPrice > 0 ? sumAvgPrice / cntAvgPrice : null;
+
+			// Fallback: if Avg Price is not present in Ads sheet, try existing series in DB
+			if (avgPriceCat == null) {
+				try {
+					// Prefer same-month bucket; fallback to latest any bucket
+					let bucketGuess = dataset.timeRange?.from || null;
+					if (!bucketGuess) {
+						const name = String(dataset.originalFilename || '');
+						let m = name.match(/(\d{4})(\d{2})(?!\d)/);
+						if (m) bucketGuess = `${m[1]}-${m[2]}`;
+						if (!bucketGuess) {
+							m = name.match(/(\d{4})[-_](\d{2})(?!\d)/);
+							if (m) bucketGuess = `${m[1]}-${m[2]}`;
+						}
+					}
+					let s = null;
+					// Try pull from a matching "US-Market-...YYYYMM-..." dataset in same category (Market Analysis -> Avg Price, Sample Type = All)
+					try {
+						const ym = bucketGuess
+							? bucketGuess.replace('-', '')
+							: null;
+						if (ym) {
+							const related = await ResearchDataset.findOne({
+								categoryId: dataset.categoryId,
+								originalFilename: {
+									$regex: new RegExp(`^US-.*${ym}`, 'i'),
+								},
+							})
+								.sort({ createdAt: -1 })
+								.lean();
+
+							if (related) {
+								s = await ResearchSeries.findOne({
+									datasetId: related._id,
+									metric: 'avg_price',
+									bucket: bucketGuess,
+									sourceSheet: {
+										$regex: /market\s*analysis/i,
+									},
+								})
+									.sort({ createdAt: -1 })
+									.lean();
+
+								// try overall bucket when Market Analysis is not monthly
+								if (!s) {
+									s = await ResearchSeries.findOne({
+										datasetId: related._id,
+										metric: 'avg_price',
+										bucket: 'overall',
+										sourceSheet: {
+											$regex: /market\s*analysis/i,
+										},
+									})
+										.sort({ createdAt: -1 })
+										.lean();
+								}
+							}
+						}
+					} catch {}
+
+					// If still not found, search across same-category US-Market datasets for that month
+					if (!s) {
+						try {
+							const ym = bucketGuess
+								? bucketGuess.replace('-', '')
+								: null;
+							if (ym) {
+								const candidates = await ResearchDataset.find({
+									categoryId: dataset.categoryId,
+									originalFilename: {
+										$regex: new RegExp(`^US-.*${ym}`, 'i'),
+									},
+								})
+									.select({ _id: 1 })
+									.lean();
+								const ids = candidates.map((d) => d._id);
+								if (ids.length) {
+									s = await ResearchSeries.findOne({
+										datasetId: { $in: ids },
+										metric: 'avg_price',
+										bucket: bucketGuess,
+										sourceSheet: {
+											$regex: /market\s*analysis/i,
+										},
+									})
+										.sort({ createdAt: -1 })
+										.lean();
+									if (!s) {
+										s = await ResearchSeries.findOne({
+											datasetId: { $in: ids },
+											metric: 'avg_price',
+											bucket: 'overall',
+											sourceSheet: {
+												$regex: /market\s*analysis/i,
+											},
+										})
+											.sort({ createdAt: -1 })
+											.lean();
+									}
+								}
+							}
+						} catch {}
+					}
+					if (bucketGuess) {
+						s = await ResearchSeries.findOne({
+							datasetId: dataset._id,
+							metric: 'avg_price',
+							bucket: bucketGuess,
+						})
+							.sort({ createdAt: -1 })
+							.lean();
+					}
+					if (!s) {
+						s = await ResearchSeries.findOne({
+							datasetId: dataset._id,
+							metric: 'avg_price',
+						})
+							.sort({ createdAt: -1 })
+							.lean();
+					}
+					if (s && typeof s.value === 'number' && isFinite(s.value)) {
+						avgPriceCat = s.value;
+					}
+				} catch {}
+			}
+
+			const roasCat =
+				cpcCat && crCat != null && avgPriceCat != null
+					? (crCat * avgPriceCat) / cpcCat
+					: null;
+			const acosCat = roasCat ? 1 / roasCat : null;
+			const clickShareCat =
+				sumClicks > 0 ? sumClickShareWeighted / sumClicks : null;
+			const tacosCat =
+				acosCat != null && clickShareCat != null
+					? acosCat * clickShareCat
+					: null;
+			const cppCat = crCat > 0 && cpcCat != null ? cpcCat / crCat : null;
+
+			// Prefer dataset timeRange; otherwise parse YYYYMM/ YYYY-MM from filename
+			let bucket = dataset.timeRange?.from || null;
+			if (!bucket) {
+				const name = String(dataset.originalFilename || '');
+				let m = name.match(/(\d{4})(\d{2})(?!\d)/); // YYYYMM
+				if (m) bucket = `${m[1]}-${m[2]}`;
+				if (!bucket) {
+					m = name.match(/(\d{4})[-_](\d{2})(?!\d)/); // YYYY-MM or YYYY_MM
+					if (m) bucket = `${m[1]}-${m[2]}`;
+				}
+				if (!bucket) bucket = 'overall';
+			}
+			const push = (metric, value, unit) => {
+				if (value == null || !isFinite(value)) return;
+				docs.push({
+					datasetId: dataset._id,
+					categoryId: dataset.categoryId,
+					metric,
+					bucket,
+					value,
+					unit,
+					sourceSheet: 'Ads Metrics',
+				});
+			};
+
+			push('ctr', ctrCat, 'pct');
+			push('cr', crCat, 'pct');
+			push('cpc', cpcCat, 'usd');
+			push('roas', roasCat, 'ratio');
+			push('acos', acosCat, 'pct');
+			push('clickshare', clickShareCat, 'pct');
+			push('tacos', tacosCat, 'pct');
+			push('cpp', cppCat, 'usd');
+
+			processedRows = rowsToProcess.length;
+
+			if (docs.length === 0) {
+				return res
+					.status(400)
+					.json({ error: 'Không tính được metric từ sheet Ads' });
+			}
+
+			await ResearchSeries.deleteMany({
+				datasetId: dataset._id,
+				sourceSheet: 'Ads Metrics',
+			});
+			await ResearchSeries.insertMany(docs);
+			await ResearchDataset.updateOne(
+				{ _id: dataset._id },
+				{ $set: { status: 'ready' } }
+			);
+
+			return res.json({
+				inserted: docs.length,
+				message:
+					'Đã tính các Ads metrics cấp category từ sheet (có dòng thừa đầu)',
+				processedData: docs,
+			});
+		}
+
+		// Helper to detect YYYY-MM from filename if dataset.timeRange is missing
+		const detectMonthFromName = (name) => {
+			if (!name) return null;
+			const s = String(name);
+			let m = s.match(/(\d{4})(\d{2})(?!\d)/); // YYYYMM
+			if (m) return `${m[1]}-${m[2]}`;
+			m = s.match(/(\d{4})[-_](\d{2})(?!\d)/); // YYYY-MM or YYYY_MM
+			if (m) return `${m[1]}-${m[2]}`;
+			return null;
+		};
 
 		// Process rows
 		for (const row of rowsToProcess) {
@@ -1116,8 +1444,11 @@ async function handleAdsMetricsSheet(dataset, rows, header, res) {
 				continue;
 			}
 
-			// Use dataset timeRange.from from filename instead of Time column
-			let bucket = dataset.timeRange?.from || 'overall';
+			// Use dataset timeRange.from or parse from original filename
+			let bucket =
+				dataset.timeRange?.from ||
+				detectMonthFromName(dataset.originalFilename) ||
+				'overall';
 
 			// Helper function to parse and clean values
 			const parseValue = (rawValue, isPercentage = false) => {
@@ -1596,6 +1927,48 @@ async function handleMarketResearchWeightSheet(dataset, rows, header, res) {
 			// non-fatal; continue
 		}
 
+		// Persist per-month series for avg weight/volume and FBA fee so heatmap and calcs can use monthly values
+		try {
+			const monthBucket = dataset.timeRange?.from || 'overall';
+			const docs = [
+				{
+					datasetId: dataset._id,
+					categoryId: dataset.categoryId,
+					metric: 'avg_weight_lb',
+					bucket: monthBucket,
+					value: avgWeightLb,
+					unit: 'count',
+					sourceSheet: String(rows?.sheetName || 'Market-research'),
+				},
+				{
+					datasetId: dataset._id,
+					categoryId: dataset.categoryId,
+					metric: 'avg_volume_in3',
+					bucket: monthBucket,
+					value: avgVolumeIn3,
+					unit: 'count',
+					sourceSheet: String(rows?.sheetName || 'Market-research'),
+				},
+				{
+					datasetId: dataset._id,
+					categoryId: dataset.categoryId,
+					metric: 'fba_fee',
+					bucket: monthBucket,
+					value: feeUSD,
+					unit: 'usd',
+					sourceSheet: String(rows?.sheetName || 'Market-research'),
+				},
+			];
+			await ResearchSeries.deleteMany({
+				datasetId: dataset._id,
+				sourceSheet: String(rows?.sheetName || 'Market-research'),
+				metric: { $in: ['avg_weight_lb', 'avg_volume_in3', 'fba_fee'] },
+			});
+			await ResearchSeries.insertMany(docs);
+		} catch (e) {
+			// non-fatal
+		}
+
 		// Also persist a referral fee default for this category if rules exist (best-effort)
 		try {
 			const catDoc = await ResearchCategory.findById(
@@ -1995,7 +2368,27 @@ router.post('/research/ingest', async (req, res) => {
 		const rows = readSheetAsArray(workbook, sheetName);
 		if (!rows.length) return res.status(400).json({ error: 'Empty sheet' });
 
-		const header = rows[0].map((h) => String(h || '').trim());
+		// If the first row is a title row like "KeywordsAnalyze-US-...-202504-20251013",
+		// re-detect the header row by scanning first ~10 rows for expected columns
+		let header = rows[0].map((h) => String(h || '').trim());
+		const joined = header.join(' ').toLowerCase();
+		const looksLikeTitle = /keywordsanalyze|batch\(\d+\)/i.test(
+			rows[0].join(' ')
+		);
+		if (looksLikeTitle || /\d{4}-?\d{2}-?\d{5,}/.test(joined)) {
+			for (let i = 1; i < Math.min(10, rows.length); i++) {
+				const cand = (rows[i] || []).map((h) => String(h || '').trim());
+				// Heuristic: header row should have >3 non-empty cells and not all numbers
+				const filled = cand.filter((c) => String(c).trim().length > 0);
+				const numeric = filled.filter((c) =>
+					/^(\$|\d|\.|,|%)/.test(String(c))
+				);
+				if (filled.length >= 4 && numeric.length < filled.length) {
+					header = cand;
+					break;
+				}
+			}
+		}
 
 		// If just preview, return sheet info
 		if (!ingest) {
@@ -2234,6 +2627,45 @@ router.get('/research/metrics-summary', async (req, res) => {
 			seriesByMetric[it.metric][it.bucket] = it.value;
 		}
 
+		// Enrich with derived Ads metrics on the fly for each month bucket
+		try {
+			const ensureNum = (v) =>
+				typeof v === 'number' && isFinite(v) ? Number(v) : null;
+			const put = (m, b, v, unit) => {
+				if (v == null || !isFinite(v)) return;
+				if (!seriesByMetric[m]) seriesByMetric[m] = {};
+				seriesByMetric[m][b] = v;
+			};
+			for (const b of timeBuckets) {
+				const cr = ensureNum(seriesByMetric?.cr?.[b]); // fraction
+				const cpc = ensureNum(seriesByMetric?.cpc?.[b]); // usd
+				let avgPrice = ensureNum(seriesByMetric?.avg_price?.[b]);
+				// if monthly avg_price missing, try overall or any available
+				if (avgPrice == null) {
+					avgPrice = ensureNum(seriesByMetric?.avg_price?.overall);
+					if (avgPrice == null) {
+						const any = Object.values(
+							seriesByMetric?.avg_price || {}
+						)[0];
+						avgPrice = ensureNum(any);
+					}
+				}
+				const roas =
+					cpc && cr != null && avgPrice != null
+						? (cr * avgPrice) / cpc
+						: null;
+				put('roas', b, roas, 'ratio');
+				const acos = roas ? 1 / roas : null;
+				put('acos', b, acos, 'pct');
+				const clickShare = ensureNum(seriesByMetric?.clickshare?.[b]); // fraction
+				const tacos =
+					acos != null && clickShare != null
+						? acos * clickShare
+						: null;
+				put('tacos', b, tacos, 'pct');
+			}
+		} catch {}
+
 		// Fallback: if no data mapped for requested metrics, pick latest record per metric
 		if (
 			(!Object.keys(seriesByMetric).length || !timeBuckets.length) &&
@@ -2363,6 +2795,186 @@ router.post('/research/compute-cogs', async (req, res) => {
 	}
 });
 
+// PUT /api/research/datasets/:id/monthly-dimensions
+// Body: { avgWeightLb, avgVolumeIn3 }
+// Purpose: manually set per-month Avg Weight/Volume for a dataset's month and compute FBA fee
+router.put('/research/datasets/:id/monthly-dimensions', async (req, res) => {
+	try {
+		const datasetId = req.params.id;
+		const { avgWeightLb, avgVolumeIn3 } = req.body || {};
+		const ds = await ResearchDataset.findById(datasetId).lean();
+		if (!ds) return res.status(404).json({ error: 'Dataset not found' });
+		const bucket = ds.timeRange?.from || null;
+		if (!bucket)
+			return res
+				.status(400)
+				.json({ error: 'Dataset month not detected' });
+
+		const w = Number(avgWeightLb);
+		const v = Number(avgVolumeIn3);
+		if (!Number.isFinite(w) || !Number.isFinite(v)) {
+			return res.status(400).json({
+				error: 'avgWeightLb and avgVolumeIn3 must be numbers',
+			});
+		}
+
+		// Compute cube side from volume and dimensional/ship weights
+		const side = Math.cbrt(Math.max(0, v));
+		const dimensionalWeight = (side * side * side) / 139;
+		const shippingWeight = Math.max(w, dimensionalWeight);
+
+		// Find size tier
+		const inFrom = (val, unit) => (unit === 'cm' ? val / 2.54 : val);
+		const lbFrom = (val, unit) => (unit === 'oz' ? val / 16 : val);
+		const rules = await SizeTierRule.find({}).lean();
+		let tier = null;
+		for (const r of rules) {
+			const longestMax =
+				r.longestMax != null
+					? inFrom(r.longestMax, r.unitLength)
+					: null;
+			const medianMax =
+				r.medianMax != null ? inFrom(r.medianMax, r.unitLength) : null;
+			const shortestMax =
+				r.shortestMax != null
+					? inFrom(r.shortestMax, r.unitLength)
+					: null;
+			const lengthGirthMax =
+				r.lengthGirthMax != null
+					? inFrom(r.lengthGirthMax, r.unitLength)
+					: null;
+			const shipMax =
+				r.shippingWeightMax != null
+					? lbFrom(r.shippingWeightMax, r.unitWeight)
+					: null;
+			const fitsDims =
+				(longestMax == null || side <= longestMax + 1e-6) &&
+				(medianMax == null || side <= medianMax + 1e-6) &&
+				(shortestMax == null || side <= shortestMax + 1e-6) &&
+				(lengthGirthMax == null ||
+					side + 2 * (side + side) <= lengthGirthMax + 1e-6);
+			const fitsWeight =
+				shipMax == null || shippingWeight <= shipMax + 1e-6;
+			if (fitsDims && fitsWeight) {
+				tier = r.tier;
+				break;
+			}
+		}
+		if (!tier)
+			return res
+				.status(400)
+				.json({ error: 'No size tier matches the given values' });
+
+		// Compute FBA fee
+		const normalizeTierName = (t) => {
+			const s = String(t || '').toLowerCase();
+			if (s.includes('small') && s.includes('standard'))
+				return 'Small Standard';
+			if (s.includes('large') && s.includes('standard'))
+				return 'Large Standard';
+			if (s.includes('oversize') || s.includes('over size'))
+				return 'Oversize';
+			return t;
+		};
+		const normalizedTier = normalizeTierName(tier);
+		let feeRules = await FbaFeeRule.find({ tier: normalizedTier }).lean();
+		if (!feeRules.length)
+			feeRules = await FbaFeeRule.find({
+				tier: { $regex: new RegExp(normalizedTier, 'i') },
+			}).lean();
+		const toUnit = (lb, unit) => (unit === 'oz' ? lb * 16 : lb);
+		let feeUSD = null;
+		for (const rule of feeRules) {
+			const weightInRule = toUnit(shippingWeight, rule.unit || 'oz');
+			const min = rule.weightMin ?? 0;
+			const max = rule.weightMax == null ? Infinity : rule.weightMax;
+			if (weightInRule >= min && weightInRule <= max) {
+				if (rule.feeUSD != null) {
+					feeUSD = rule.feeUSD;
+				} else if (
+					rule.baseUSD != null &&
+					Array.isArray(rule.overageRules) &&
+					rule.overageRules.length
+				) {
+					let total = rule.baseUSD;
+					for (const over of rule.overageRules) {
+						const current =
+							over.overThresholdUnit === 'oz'
+								? shippingWeight * 16
+								: shippingWeight;
+						if (current > over.overThresholdValue) {
+							const overage = current - over.overThresholdValue;
+							const steps = Math.ceil(overage / over.stepValue);
+							total += steps * (over.stepFeeUSD || 0);
+						}
+					}
+					feeUSD = total;
+				}
+				break;
+			}
+		}
+		if (feeUSD == null)
+			return res
+				.status(400)
+				.json({ error: 'No FBA fee rule band matched' });
+
+		// Persist series
+		const docs = [
+			{
+				datasetId: ds._id,
+				categoryId: ds.categoryId,
+				metric: 'avg_weight_lb',
+				bucket,
+				value: w,
+				unit: 'count',
+				sourceSheet: 'Manual',
+			},
+			{
+				datasetId: ds._id,
+				categoryId: ds.categoryId,
+				metric: 'avg_volume_in3',
+				bucket,
+				value: v,
+				unit: 'count',
+				sourceSheet: 'Manual',
+			},
+			{
+				datasetId: ds._id,
+				categoryId: ds.categoryId,
+				metric: 'fba_fee',
+				bucket,
+				value: feeUSD,
+				unit: 'usd',
+				sourceSheet: 'Manual',
+			},
+		];
+		await ResearchSeries.deleteMany({
+			datasetId,
+			metric: { $in: ['avg_weight_lb', 'avg_volume_in3', 'fba_fee'] },
+			bucket,
+		});
+		await ResearchSeries.insertMany(docs);
+
+		// Also update category last known values (best-effort)
+		await ResearchCategory.updateOne(
+			{ _id: ds.categoryId },
+			{
+				$set: {
+					avgWeightLb: w,
+					avgVolumeIn3: v,
+					fbaFeeUsd: feeUSD,
+					sizeTierEstimate: normalizedTier,
+				},
+			}
+		);
+
+		res.json({ message: 'Monthly dimensions saved', docs });
+	} catch (e) {
+		console.error('Save monthly dimensions failed', e);
+		res.status(500).json({ error: 'Failed to save monthly dimensions' });
+	}
+});
+
 // GET /api/research/categories
 router.get('/research/categories', async (req, res) => {
 	try {
@@ -2370,6 +2982,55 @@ router.get('/research/categories', async (req, res) => {
 		res.json(items);
 	} catch (e) {
 		res.status(500).json({ error: 'Failed to fetch categories' });
+	}
+});
+
+// PUT /api/research/categories/:id - Update category-level defaults (e.g., avgWeightLb, avgVolumeIn3)
+router.put('/research/categories/:id', async (req, res) => {
+	try {
+		const { id } = req.params;
+		const {
+			name,
+			description,
+			avgWeightLb,
+			avgVolumeIn3,
+			fbaFeeUsd,
+			sizeTierEstimate,
+		} = req.body || {};
+
+		const payload = {};
+		if (name !== undefined) payload.name = name;
+		if (description !== undefined) payload.description = description;
+		if (avgWeightLb !== undefined)
+			payload.avgWeightLb =
+				avgWeightLb === null || avgWeightLb === ''
+					? undefined
+					: Number(avgWeightLb);
+		if (avgVolumeIn3 !== undefined)
+			payload.avgVolumeIn3 =
+				avgVolumeIn3 === null || avgVolumeIn3 === ''
+					? undefined
+					: Number(avgVolumeIn3);
+		if (fbaFeeUsd !== undefined)
+			payload.fbaFeeUsd =
+				fbaFeeUsd === null || fbaFeeUsd === ''
+					? undefined
+					: Number(fbaFeeUsd);
+		if (sizeTierEstimate !== undefined)
+			payload.sizeTierEstimate = sizeTierEstimate;
+
+		const updated = await ResearchCategory.findByIdAndUpdate(
+			id,
+			{ $set: payload },
+			{ new: true }
+		).lean();
+
+		if (!updated)
+			return res.status(404).json({ error: 'Category not found' });
+		res.json(updated);
+	} catch (e) {
+		console.error('Update category failed', e);
+		res.status(500).json({ error: 'Failed to update category' });
 	}
 });
 
@@ -2587,6 +3248,9 @@ router.get('/research/category/:id', async (req, res) => {
 		const marginSeries = [];
 		const roiSeries = [];
 		const cogsSeries = [];
+		const roasSeries = [];
+		const acosSeries = [];
+		const tacosSeries = [];
 		for (const b of derivedBuckets) {
 			const avgP = avgPriceByBucket[b]?.value;
 			if (typeof avgP !== 'number') continue;
@@ -2602,6 +3266,24 @@ router.get('/research/category/:id', async (req, res) => {
 			profitSeries.push({ bucket: b, value: profit });
 			marginSeries.push({ bucket: b, value: margin });
 			roiSeries.push({ bucket: b, value: roi });
+
+			// Ads derived metrics per bucket
+			const pickFirst = (metricKey) => {
+				const arr = byMetricBucket[metricKey]?.[b];
+				if (!arr || !arr.length) return null;
+				const v = Number(arr[0].value);
+				return Number.isFinite(v) ? v : null;
+			};
+			const cr = pickFirst('cr');
+			const cpc = pickFirst('cpc');
+			const clickShare = pickFirst('clickshare');
+			const roas = cpc && cr != null ? (cr * avgP) / cpc : null;
+			const acos = roas ? 1 / roas : null;
+			const tacos =
+				acos != null && clickShare != null ? acos * clickShare : null;
+			if (roas != null) roasSeries.push({ bucket: b, value: roas });
+			if (acos != null) acosSeries.push({ bucket: b, value: acos });
+			if (tacos != null) tacosSeries.push({ bucket: b, value: tacos });
 		}
 		const injectDerived = (key, unit, series) => {
 			timeSeriesData[key] = {
@@ -2614,6 +3296,9 @@ router.get('/research/category/:id', async (req, res) => {
 		injectDerived('profit', 'usd', profitSeries);
 		injectDerived('margin', 'pct', marginSeries);
 		injectDerived('roi', 'pct', roiSeries);
+		injectDerived('roas', 'ratio', roasSeries);
+		injectDerived('acos', 'pct', acosSeries);
+		injectDerived('tacos', 'pct', tacosSeries);
 
 		// Build comprehensive response
 		const response = {
@@ -2757,6 +3442,40 @@ router.post('/research/categories', async (req, res) => {
 			error: 'Failed to create category',
 			details: e.message,
 		});
+	}
+});
+
+// DELETE /api/research/categories/:id - Cascade delete category, datasets, and series
+router.delete('/research/categories/:id', async (req, res) => {
+	try {
+		const categoryId = req.params.id;
+		const cat = await ResearchCategory.findById(categoryId).lean();
+		if (!cat) return res.status(404).json({ error: 'Category not found' });
+
+		const datasets = await ResearchDataset.find({ categoryId })
+			.select({ _id: 1 })
+			.lean();
+		const datasetIds = datasets.map((d) => d._id);
+
+		// Delete series for these datasets
+		if (datasetIds.length) {
+			await ResearchSeries.deleteMany({ datasetId: { $in: datasetIds } });
+		}
+		// Delete the datasets
+		await ResearchDataset.deleteMany({ categoryId });
+		// Delete the category
+		await ResearchCategory.deleteOne({ _id: categoryId });
+
+		res.json({
+			deleted: {
+				category: categoryId,
+				datasets: datasetIds.length,
+				series: 'all for datasets',
+			},
+		});
+	} catch (e) {
+		console.error('Failed to delete category:', e);
+		res.status(500).json({ error: 'Failed to delete category' });
 	}
 });
 

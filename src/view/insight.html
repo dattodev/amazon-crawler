@@ -392,6 +392,28 @@
 				margin-top: 20px;
 			}
 
+			/* Loading indicator */
+			.loading-wrap {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				padding: 16px;
+				color: #666;
+			}
+			.spinner {
+				width: 16px;
+				height: 16px;
+				border: 2px solid #ddd;
+				border-top-color: var(--primary-orange);
+				border-radius: 50%;
+				animation: spin 0.9s linear infinite;
+			}
+			@keyframes spin {
+				to {
+					transform: rotate(360deg);
+				}
+			}
+
 			/* Grid layout for heatmap */
 			.heatmap-grid {
 				display: grid;
@@ -607,6 +629,8 @@
 
 			const DEFAULT_SELECTED = new Set(['sales_units', 'revenue']);
 			const selected = new Set([...DEFAULT_SELECTED]);
+			// Track user click order for metrics; first item determines sorting when multiple are selected
+			let selectedOrder = ['sales_units', 'revenue'];
 			const selectedCategories = new Set();
 			let monthsLimit = 12;
 			let allCategories = [];
@@ -820,8 +844,19 @@
 						(selected.has(m.code) ? ' selected' : '');
 					div.textContent = m.name;
 					div.onclick = () => {
-						if (selected.has(m.code)) selected.delete(m.code);
-						else selected.add(m.code);
+						if (selected.has(m.code)) {
+							selected.delete(m.code);
+							// remove from order
+							selectedOrder = selectedOrder.filter(
+								(c) => c !== m.code
+							);
+						} else {
+							selected.add(m.code);
+							// append to the end as latest clicked
+							selectedOrder = selectedOrder
+								.filter((c) => c !== m.code)
+								.concat(m.code);
+						}
 						// visually toggle selected state
 						div.classList.toggle('selected', selected.has(m.code));
 						document.querySelector(
@@ -841,6 +876,7 @@
 				if (clearBtn && !clearBtn.__bound) {
 					clearBtn.onclick = () => {
 						selected.clear();
+						selectedOrder = [];
 						// update chip visuals
 						document
 							.querySelectorAll('.list-metrics .metric-item')
@@ -1121,9 +1157,19 @@
 
 						if (!dataA || !dataB) return 0;
 
-						// Get the primary metric to sort by
-						const primaryMetric = selectedDefs[0]; // First selected metric
-						if (!primaryMetric) return 0;
+						// Determine primary metric to sort by: first in user-selected order if available,
+						// otherwise fallback to first selected in list
+						let primaryCode = null;
+						for (const code of selectedOrder) {
+							if (selected.has(code)) {
+								primaryCode = code;
+								break;
+							}
+						}
+						if (!primaryCode && selectedDefs.length) {
+							primaryCode = selectedDefs[0].code;
+						}
+						if (!primaryCode) return 0;
 
 						// Get latest value for primary metric
 						const getLatestValue = (data, metricCode) => {
@@ -1146,14 +1192,8 @@
 							return latestMonth ? latestMonth.value : null;
 						};
 
-						const valueA = getLatestValue(
-							dataA,
-							primaryMetric.code
-						);
-						const valueB = getLatestValue(
-							dataB,
-							primaryMetric.code
-						);
+						const valueA = getLatestValue(dataA, primaryCode);
+						const valueB = getLatestValue(dataB, primaryCode);
 
 						// Handle null values
 						if (valueA == null && valueB == null) return 0;
@@ -1340,6 +1380,9 @@
 
 			async function loadCategories() {
 				try {
+					// Show loading in sidebar list while fetching
+					document.getElementById('categoryList').innerHTML =
+						'<div class="loading-wrap"><div class="spinner"></div><div>Loading categories...</div></div>';
 					const r = await fetch('/api/research/categories');
 					if (!r.ok) throw new Error('Failed to load categories');
 					allCategories = await r.json();
@@ -1454,6 +1497,11 @@
 				} else {
 					selectedCategories.add(categoryId);
 					console.log('Added category:', categoryId);
+					// Show loading in heatmap area while fetching category data
+					const body = document.querySelector('.heatmap-table-body');
+					if (body)
+						body.innerHTML =
+							'<div class="loading-wrap"><div class="spinner"></div><div>Loading data...</div></div>';
 					// Load category data if not already loaded
 					if (!allCategoryData.has(categoryId)) {
 						try {
@@ -1546,6 +1594,12 @@
 				const visibleCategories = Array.from(
 					document.querySelectorAll('.category-item')
 				).map((item) => item.dataset.categoryId);
+
+				// Show loading in heatmap while bulk loading
+				const body = document.querySelector('.heatmap-table-body');
+				if (body)
+					body.innerHTML =
+						'<div class="loading-wrap"><div class="spinner"></div><div>Loading data...</div></div>';
 
 				for (const categoryId of visibleCategories) {
 					if (!selectedCategories.has(categoryId)) {

@@ -90,6 +90,28 @@
 				color: #888;
 				margin-top: 6px;
 			}
+
+			/* Loading indicator */
+			.loading-wrap {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				padding: 12px;
+				color: #666;
+			}
+			.spinner {
+				width: 16px;
+				height: 16px;
+				border: 2px solid #ddd;
+				border-top-color: #ef6c00;
+				border-radius: 50%;
+				animation: spin 0.9s linear infinite;
+			}
+			@keyframes spin {
+				to {
+					transform: rotate(360deg);
+				}
+			}
 		</style>
 
 		<div class="container page-wrap" style="padding: 16px">
@@ -324,29 +346,33 @@
 					el.innerHTML = '<p class="muted">No categories yet.</p>';
 					return;
 				}
-				const rows = items
-					.map(
-						(c, i) =>
-							`<tr>
-								<td>${i + 1}</td>
-								<td>${c.name}</td>
-								<td><code>${c.slug}</code></td>
-								<td>
-									<button class="btn-primary" style="padding:6px 10px;font-size:0.8rem;margin-right:6px" onclick="triggerRowUpload('${
-										c.slug
-									}')">Upload Excel</button>
-									<button style="background:#555;color:#fff;border:none;padding:6px 10px;border-radius:8px;font-size:0.8rem" onclick="loadDatasets('${
-										c.slug
-									}')">View Datasets</button>
-								</td>
-							</tr>`
-					)
+				// Render per-category cards (no global weight/volume inputs)
+				const cards = items
+					.map((c) => {
+						return `
+							<div class="card" style="margin-top:12px;">
+								<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+									<div>
+										<div style="font-weight:700;font-size:1rem;">${c.name}</div>
+										<div class="muted"><code>${c.slug}</code></div>
+									</div>
+									<div style="display:flex;gap:8px;flex-wrap:wrap;">
+										<button class="btn-primary" style="padding:6px 10px;font-size:0.8rem;" onclick="triggerRowUpload('${c.slug}')">Upload Excel</button>
+										<button style="background:#555;color:#fff;border:none;padding:6px 10px;border-radius:8px;font-size:0.8rem" onclick="loadDatasets('${c.slug}')">View Datasets</button>
+										<button style="background:#c62828;color:#fff;border:none;padding:6px 10px;border-radius:8px;font-size:0.8rem" onclick="deleteCategory('${c._id}', '${c.slug}')">Delete</button>
+									</div>
+								</div>
+							</div>
+						`;
+					})
 					.join('');
-				el.innerHTML = `<table class="cat-table"><thead><tr><th>#</th><th>Name</th><th>Slug</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`;
-				// legacy select removed; datasets are loaded via row action
+				el.innerHTML = cards;
 			}
 
 			async function refresh() {
+				// show loading while fetching categories
+				document.getElementById('catList').innerHTML =
+					'<div class="loading-wrap"><div class="spinner"></div><div>Loading categories...</div></div>';
 				const items = await fetchCategories();
 				renderCategoryList(items);
 				if (items.length) {
@@ -357,6 +383,9 @@
 			async function loadDatasets(slug) {
 				try {
 					currentCategorySlug = slug;
+					// show loading in dataset area
+					document.getElementById('datasetList').innerHTML =
+						'<div class="loading-wrap"><div class="spinner"></div><div>Loading datasets...</div></div>';
 					const r = await fetch(
 						`/api/research/datasets?categorySlug=${encodeURIComponent(
 							slug
@@ -369,12 +398,48 @@
 							'<p class="muted">No datasets yet for this category.</p>';
 						return;
 					}
-					const rows = data.datasets
+					// Enrich with monthly metrics in parallel
+					const datasets = data.datasets || [];
+					const enriched = await Promise.all(
+						datasets.map(async (d) => {
+							try {
+								const qs = new URLSearchParams({
+									datasetId: d.id,
+									metrics:
+										'avg_weight_lb,avg_volume_in3,fba_fee',
+								}).toString();
+								const r2 = await fetch(
+									`/api/research/metrics-summary?${qs}`
+								);
+								const js = r2.ok
+									? await r2.json()
+									: { seriesByMetric: {} };
+								const b =
+									(d.timeRange && d.timeRange.from) ||
+									(js.timeBuckets || [])[0];
+								const getVal = (m) =>
+									js.seriesByMetric && js.seriesByMetric[m]
+										? js.seriesByMetric[m][b]
+										: undefined;
+								return {
+									...d,
+									monthBucket: b,
+									weight: getVal('avg_weight_lb'),
+									volume: getVal('avg_volume_in3'),
+									fbaFee: getVal('fba_fee'),
+								};
+							} catch {
+								return { ...d, monthBucket: null };
+							}
+						})
+					);
+
+					const rows = enriched
 						.map(
 							(d, i) => `
-								<tr>
-									<td>${i + 1}</td>
-									<td>${
+                                <tr>
+                                    <td>${i + 1}</td>
+                                    <td>${
 										d.originalFilename.length > 40
 											? d.originalFilename.substring(
 													0,
@@ -382,31 +447,48 @@
 											  ) + '...'
 											: d.originalFilename
 									}</td>
-									<td>${new Date(d.createdAt).toLocaleString()}</td>
-									<td>${d.status}</td>
-									<td>${d.sheetCount}</td>
-									<td>
-										<button class="btn-primary" onclick="selectSheet('${d.id}', '${
-								d.originalFilename
-							}')", style="padding: 4px 8px; font-size: 0.8rem;">
-											View
-										</button>
-										<button onclick="deleteDataset('${
+                                    <td>${d.timeRange?.from || '-'}</td>
+                                    <td>
+                                        <input id="w_${
 											d.id
-										}')" style="background:#c62828;color:#fff;border:none;padding:4px 8px;border-radius:8px;font-size:0.8rem;margin-left:6px">Delete</button>
-									</td>
-								</tr>`
+										}" type="number" step="0.01" placeholder="e.g. 0.25" value="${
+								d.weight ?? ''
+							}" style="width:110px;padding:6px 8px;border:1px solid #ddd;border-radius:6px" />
+                                    </td>
+                                    <td>
+                                        <input id="v_${
+											d.id
+										}" type="number" step="0.01" placeholder="e.g. 64.5" value="${
+								d.volume ?? ''
+							}" style="width:110px;padding:6px 8px;border:1px solid #ddd;border-radius:6px" />
+                                    </td>
+                                    <td>
+                                        <span id="f_${d.id}">${
+								d.fbaFee != null
+									? '$' + Number(d.fbaFee).toFixed(2)
+									: '—'
+							}</span>
+                                    </td>
+                                    <td>
+                                        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                                            <button class="btn-primary" onclick="selectSheet('${
+												d.id
+											}', '${
+								d.originalFilename
+							}')" style="padding: 4px 8px; font-size: 0.8rem;">View</button>
+                                            <button onclick="deleteDataset('${
+												d.id
+											}')" style="background:#c62828;color:#fff;border:none;padding:4px 8px;border-radius:8px;font-size:0.8rem">Delete</button>
+                                            <button onclick="saveMonthlyDims('${
+												d.id
+											}')" style="background:#2e7d32;color:#fff;border:none;padding:4px 8px;border-radius:8px;font-size:0.8rem">Save</button>
+                                        </div>
+                                    </td>
+                                </tr>`
 						)
 						.join('');
-					el.innerHTML = `<table class="cat-table"><thead><tr><th>#</th><th>Filename</th><th>Uploaded</th><th>Status</th><th>Sheets</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table>`;
-					// Add compute COGS action
-					const cta = document.createElement('div');
-					cta.style.marginTop = '10px';
-					cta.innerHTML = `
-						<button class="btn-primary" style="padding:6px 10px;font-size:0.85rem;margin-right:8px" onclick="computeCogs()">Compute COGS cap</button>
-						<button style="background:#ff9800;color:#fff;border:none;padding:6px 10px;border-radius:8px;font-size:0.85rem" onclick="migrateBuckets()">Fix Bucket Format</button>
-					`;
-					el.appendChild(cta);
+					el.innerHTML = `<table class="cat-table"><thead><tr><th>#</th><th>Filename</th><th>Month</th><th>Avg Weight (lb)</th><th>Avg Volume (in³)</th><th>FBA Fee</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table>`;
+					// Removed bottom CTA buttons (Compute COGS cap, Fix Bucket Format)
 				} catch (e) {
 					document.getElementById('datasetList').innerHTML =
 						'<p class="muted">Failed to load datasets.</p>';
@@ -468,6 +550,8 @@
 				uploadSlugFromRow = slug;
 				document.getElementById('rowUploadFile').click();
 			}
+
+			// removed global defaults (no per-category weight/volume Save)
 
 			async function uploadExcel(forcedSlug, forcedFile) {
 				const slug = forcedSlug; // row-based upload only
@@ -577,6 +661,20 @@
 				);
 				if (mrSheet && !toProcess.includes(mrSheet))
 					toProcess.push(mrSheet);
+				// Include Ads-like sheets (batch/ads/keyword/christmas) if present
+				const ADS_LIKE = (available || []).filter((n) => {
+					const s = String(n).toLowerCase();
+					return (
+						s.includes('batch') ||
+						s.includes('ads') ||
+						s.includes('keyword') ||
+						s.includes('mining') ||
+						s.includes('christmas')
+					);
+				});
+				for (const adName of ADS_LIKE) {
+					if (!toProcess.includes(adName)) toProcess.push(adName);
+				}
 				// Always attempt; backend may fuzzy-match sheetName
 
 				// 5) Ingest sequentially to keep server load mild
@@ -601,8 +699,23 @@
 					}
 				}
 
-				// 6) Refresh UI once done
+				// 6) Refresh UI once done and open Insight for this category
 				await loadDatasets(categorySlug);
+				try {
+					await openInsightForSlug(categorySlug);
+				} catch {}
+			}
+
+			// Helper: navigate to Insight with category id for immediate rendering
+			async function openInsightForSlug(slug) {
+				if (!slug) return;
+				const cats = await fetchCategories();
+				const cat = cats.find((c) => c.slug === slug);
+				if (cat && cat._id) {
+					window.location.href = `insight.html?id=${encodeURIComponent(
+						cat._id
+					)}`;
+				}
 			}
 
 			async function selectSheet(datasetId, filename) {
@@ -611,6 +724,9 @@
 				document.getElementById('sheetModal').style.display = 'block';
 
 				try {
+					document.getElementById('sheetList').innerHTML =
+						'<div class="loading-wrap"><div class="spinner"></div><div>Loading sheets...</div></div>';
+					document.getElementById('sheetPreview').innerHTML = '';
 					const r = await fetch(
 						`/api/research/select-sheet?datasetId=${datasetId}`
 					);
@@ -666,6 +782,8 @@
 
 			async function previewSheet(sheetName) {
 				try {
+					document.getElementById('sheetPreview').innerHTML =
+						'<div class="loading-wrap"><div class="spinner"></div><div>Loading preview...</div></div>';
 					const r = await fetch('/api/research/ingest', {
 						method: 'POST',
 						headers: { 'Content-Type': 'application/json' },
@@ -756,6 +874,8 @@
 
 			async function ingestAdsMetrics(sheetName) {
 				try {
+					document.getElementById('sheetPreview').innerHTML =
+						'<div class="loading-wrap"><div class="spinner"></div><div>Processing ads metrics...</div></div>';
 					const r = await fetch('/api/research/ingest', {
 						method: 'POST',
 						headers: { 'Content-Type': 'application/json' },
@@ -1755,6 +1875,79 @@
 					await loadDatasets(currentCategorySlug || '');
 				} catch (e) {
 					alert('Error deleting dataset: ' + e.message);
+				}
+			}
+
+			async function deleteCategory(categoryId, slug) {
+				if (
+					!confirm(
+						'Delete this category and ALL its datasets and metrics?'
+					)
+				)
+					return;
+				try {
+					const r = await fetch(
+						`/api/research/categories/${categoryId}`,
+						{ method: 'DELETE' }
+					);
+					if (!r.ok) {
+						const e = await r.json().catch(() => ({}));
+						alert('Delete failed: ' + (e.error || r.status));
+						return;
+					}
+					await refresh();
+					if (slug && currentCategorySlug === slug) {
+						currentCategorySlug = null;
+						document.getElementById('datasetList').innerHTML =
+							'<p class="muted">Select a category</p>';
+					}
+				} catch (e) {
+					alert('Error deleting category: ' + e.message);
+				}
+			}
+
+			async function saveMonthlyDims(datasetId) {
+				try {
+					const w = parseFloat(
+						document.getElementById(`w_${datasetId}`).value
+					);
+					const v = parseFloat(
+						document.getElementById(`v_${datasetId}`).value
+					);
+					if (!isFinite(w) || !isFinite(v)) {
+						alert(
+							'Please enter valid numbers for weight and volume'
+						);
+						return;
+					}
+					const r = await fetch(
+						`/api/research/datasets/${datasetId}/monthly-dimensions`,
+						{
+							method: 'PUT',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({
+								avgWeightLb: w,
+								avgVolumeIn3: v,
+							}),
+						}
+					);
+					if (!r.ok) {
+						const e = await r.json().catch(() => ({}));
+						alert('Save failed: ' + (e.error || r.status));
+						return;
+					}
+					const js = await r.json();
+					const fee = Array.isArray(js.docs)
+						? js.docs.find((d) => d.metric === 'fba_fee')
+						: null;
+					if (fee) {
+						const el = document.getElementById(`f_${datasetId}`);
+						if (el)
+							el.textContent = '$' + Number(fee.value).toFixed(2);
+					}
+					alert('Saved monthly dimensions');
+				} catch (e) {
+					alert('Error: ' + e.message);
 				}
 			}
 
