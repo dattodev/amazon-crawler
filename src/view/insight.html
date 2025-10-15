@@ -436,6 +436,36 @@
 				justify-content: center;
 			}
 
+			.heatmap-cell.header.sortable {
+				cursor: pointer;
+				user-select: none;
+				transition: all 0.2s ease;
+				position: relative;
+			}
+
+			.heatmap-cell.header.sortable:hover {
+				background: #e9ecef;
+			}
+
+			.heatmap-cell.header.sortable.active {
+				/* background: var(--primary-orange); */
+				color: var(--primary-orange);
+			}
+
+			.sort-icon {
+				margin-left: 6px;
+				font-size: 12px;
+				opacity: 0.6;
+			}
+
+			.heatmap-cell.header.sortable:hover .sort-icon {
+				opacity: 1;
+			}
+
+			.heatmap-cell.header.sortable.active .sort-icon {
+				opacity: 1;
+			}
+
 			.heatmap-cell.category {
 				font-weight: 600;
 				color: #333;
@@ -635,6 +665,7 @@
 			let monthsLimit = 12;
 			let allCategories = [];
 			let allCategoryData = new Map(); // categoryId -> data
+			let currentSortMonth = null; // Track which month is currently being sorted by
 
 			function getQueryParam(name) {
 				const url = new URL(window.location.href);
@@ -959,9 +990,10 @@
 					buckets
 						.map(
 							(b) =>
-								`<div class="heatmap-cell header">${bucketLabel(
-									b
-								)}</div>`
+								`<div class="heatmap-cell header sortable" onclick="sortByMonth('${b}')" data-month="${b}">
+									${bucketLabel(b)}
+									<span class="sort-icon">↓↑</span>
+								</div>`
 						)
 						.join(''),
 					'</div>',
@@ -1171,8 +1203,12 @@
 						}
 						if (!primaryCode) return 0;
 
-						// Get latest value for primary metric
-						const getLatestValue = (data, metricCode) => {
+						// Get value for primary metric - either from specific month or latest
+						const getValueForMetric = (
+							data,
+							metricCode,
+							targetMonth = null
+						) => {
 							const byMetric = {};
 							(data.timeSeriesData || []).forEach(
 								(m) => (byMetric[m.metric] = m)
@@ -1182,7 +1218,15 @@
 							if (!metricData || !metricData.timeSeries)
 								return null;
 
-							// Find latest month value
+							// If specific month requested, get that month's value
+							if (targetMonth) {
+								const monthData = metricData.timeSeries.find(
+									(ts) => ts.bucket === targetMonth
+								);
+								return monthData ? monthData.value : null;
+							}
+
+							// Otherwise find latest month value
 							const latestMonth = metricData.timeSeries
 								.filter((ts) => /^\d{4}-\d{2}$/.test(ts.bucket))
 								.sort((a, b) =>
@@ -1192,8 +1236,16 @@
 							return latestMonth ? latestMonth.value : null;
 						};
 
-						const valueA = getLatestValue(dataA, primaryCode);
-						const valueB = getLatestValue(dataB, primaryCode);
+						const valueA = getValueForMetric(
+							dataA,
+							primaryCode,
+							currentSortMonth
+						);
+						const valueB = getValueForMetric(
+							dataB,
+							primaryCode,
+							currentSortMonth
+						);
 
 						// Handle null values
 						if (valueA == null && valueB == null) return 0;
@@ -1376,6 +1428,33 @@
 				});
 
 				container.innerHTML = header + metricRows.join('');
+
+				// Update active sort indicator
+				updateSortIndicators();
+			}
+
+			function updateSortIndicators() {
+				// Remove active class from all sortable headers
+				document
+					.querySelectorAll('.heatmap-cell.header.sortable')
+					.forEach((header) => {
+						header.classList.remove('active');
+					});
+
+				// Add active class to current sort month
+				if (currentSortMonth) {
+					const activeHeader = document.querySelector(
+						`[data-month="${currentSortMonth}"]`
+					);
+					if (activeHeader) {
+						activeHeader.classList.add('active');
+					}
+				}
+			}
+
+			function sortByMonth(month) {
+				currentSortMonth = month;
+				renderHeatmap();
 			}
 
 			async function loadCategories() {
