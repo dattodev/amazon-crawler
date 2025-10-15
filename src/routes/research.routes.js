@@ -2206,12 +2206,24 @@ async function autoIngestStandardSheets(dataset) {
 		}
 
 		// Also attempt Ads metrics sheet if present by fuzzy name (batch files)
-		const adsName = (workbook.SheetNames || []).find(
+		let adsName = (workbook.SheetNames || []).find(
 			(n) =>
 				String(n).toLowerCase().includes('batch') ||
 				String(n).toLowerCase().includes('ads') ||
-				String(n).toLowerCase().includes('christmas')
+				String(n).toLowerCase().includes('keyword') ||
+				String(n).toLowerCase().includes('mining') ||
+				String(n).toLowerCase().includes('christmas') ||
+				String(n).toLowerCase().includes('us-')
 		);
+		// If filename suggests KeywordMining but no fuzzy match above, fall back to first sheet
+		if (!adsName) {
+			const isKeywordMiningFile = String(dataset.originalFilename || '')
+				.toLowerCase()
+				.startsWith('keywordmining-');
+			if (isKeywordMiningFile && (workbook.SheetNames || []).length) {
+				adsName = workbook.SheetNames[0];
+			}
+		}
 		if (adsName) {
 			const rows = readSheetAsArray(workbook, adsName);
 			if (rows.length) {
@@ -2430,11 +2442,14 @@ router.post('/research/ingest', async (req, res) => {
 			return handleMarketResearchWeightSheet(dataset, rows, header, res);
 		}
 
-		// Special handling for ads metrics sheets (batch files)
+		// Special handling for ads metrics sheets (batch/keyword mining files)
 		if (
 			String(sheetName).toLowerCase().includes('batch') ||
 			String(sheetName).toLowerCase().includes('ads') ||
-			String(sheetName).toLowerCase().includes('christmas')
+			String(sheetName).toLowerCase().includes('keyword') ||
+			String(sheetName).toLowerCase().includes('mining') ||
+			String(sheetName).toLowerCase().includes('christmas') ||
+			String(sheetName).toLowerCase().includes('us-')
 		) {
 			return handleAdsMetricsSheet(dataset, rows, header, res);
 		}

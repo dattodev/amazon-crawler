@@ -594,6 +594,9 @@
 			// Auto-ingest helper: process common sheets right after upload
 			async function autoIngestStandardSheets(categorySlug, filename) {
 				if (!categorySlug || !filename) return;
+				const isKeywordMining = String(filename || '')
+					.toLowerCase()
+					.startsWith('keywordmining-');
 				// 1) Find dataset by filename
 				const r = await fetch(
 					`/api/research/datasets?categorySlug=${encodeURIComponent(
@@ -676,6 +679,11 @@
 					if (!toProcess.includes(adName)) toProcess.push(adName);
 				}
 				// Always attempt; backend may fuzzy-match sheetName
+
+				// Prefer first sheet for KeywordMining-* files if we couldn't identify specific ads-like sheet names
+				if (isKeywordMining && !toProcess.length && available.length) {
+					toProcess = [available[0]];
+				}
 
 				// 5) Ingest sequentially to keep server load mild
 				for (const sheetName of toProcess) {
@@ -763,6 +771,9 @@
 						n.includes('market-research') ||
 						n.includes('batch') ||
 						n.includes('ads') ||
+						n.includes('us-') ||
+						n.includes('keyword') ||
+						n.includes('mining') ||
 						n.includes('christmas')
 					);
 				};
@@ -806,6 +817,9 @@
 
 					currentSheetName = sheetName;
 					// Special handling for Market Analysis and Fulfillment sheets
+					const isKeywordMiningFile = String(currentFilename || '')
+						.toLowerCase()
+						.startsWith('keywordmining-');
 					if (sheetName === 'Market Analysis') {
 						renderMarketAnalysisPreview(data);
 					} else if (sheetName === 'Fulfillment') {
@@ -821,8 +835,12 @@
 					) {
 						renderMarketResearchPreview(data);
 					} else if (
+						isKeywordMiningFile ||
 						sheetName.toLowerCase().includes('batch') ||
 						sheetName.toLowerCase().includes('ads') ||
+						sheetName.toLowerCase().includes('us-') ||
+						sheetName.toLowerCase().includes('keyword') ||
+						sheetName.toLowerCase().includes('mining') ||
 						sheetName.toLowerCase().includes('christmas')
 					) {
 						renderAdsMetricsPreview(data, sheetName);
@@ -864,12 +882,43 @@
 							<button class="btn-primary" onclick="ingestAdsMetrics('${sheetName}')">
 								Process Ads Metrics Sheet
 							</button>
+							<button onclick="processFirstSheetIfKeywordMining()" style="margin-left: 8px; background: #ef6c00; color: #fff; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer;">
+								Process First Sheet
+							</button>
 							<button onclick="closeSheetModal()" style="margin-left: 8px; background: #666; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer;">
 								Cancel
 							</button>
 						</div>
 					</div>
 				`;
+			}
+
+			async function processFirstSheetIfKeywordMining() {
+				try {
+					if (!currentDatasetId || !currentFilename) return;
+					const isKeywordMining = String(currentFilename || '')
+						.toLowerCase()
+						.startsWith('keywordmining-');
+					if (!isKeywordMining) {
+						alert('This action is only for KeywordMining-* files.');
+						return;
+					}
+					const r = await fetch(
+						`/api/research/select-sheet?datasetId=${currentDatasetId}`
+					);
+					if (!r.ok) return;
+					const data = await r.json();
+					const first = (data.sheets || [])[0]?.name;
+					if (!first) {
+						alert('No sheet found in this file.');
+						return;
+					}
+					await ingestAdsMetrics(first);
+				} catch (e) {
+					alert(
+						'Failed to process first sheet: ' + (e?.message || e)
+					);
+				}
 			}
 
 			async function ingestAdsMetrics(sheetName) {
