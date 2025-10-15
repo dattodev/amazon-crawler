@@ -2670,7 +2670,7 @@ router.get('/research/metrics-summary', async (req, res) => {
 						? (cr * avgPrice) / cpc
 						: null;
 				put('roas', b, roas, 'ratio');
-				const acos = roas ? 1 / roas : null;
+				const acos = roas ? (1 / roas) * 100 : null;
 				put('acos', b, acos, 'pct');
 				const clickShare = ensureNum(seriesByMetric?.clickshare?.[b]); // fraction
 				const tacos =
@@ -3293,7 +3293,7 @@ router.get('/research/category/:id', async (req, res) => {
 			const cpc = pickFirst('cpc');
 			const clickShare = pickFirst('clickshare');
 			const roas = cpc && cr != null ? (cr * avgP) / cpc : null;
-			const acos = roas ? 1 / roas : null;
+			const acos = roas ? (1 / roas) * 100 : null;
 			const tacos =
 				acos != null && clickShare != null ? acos * clickShare : null;
 			if (roas != null) roasSeries.push({ bucket: b, value: roas });
