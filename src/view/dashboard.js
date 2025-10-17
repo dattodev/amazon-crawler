@@ -1,5 +1,15 @@
 let displayMode = 'grid'; // or 'table'
 let currentTab = 'regular'; // 'regular' | 'bestsellers' | 'feerule' | 'fbafee'
+// Query param helper
+function getQueryParam(name) {
+	try {
+		const url = new URL(window.location.href);
+		return url.searchParams.get(name);
+	} catch (_) {
+		return null;
+	}
+}
+
 let imageOnlyCols = 0; // 0=off, 4/5/6 columns when image-only
 
 // Cache for referral fee rules
@@ -411,11 +421,21 @@ function renderSidebar(sellers, categories, sources) {
 	categoryDiv.innerHTML = categoryHtml;
 
 	// Render sources (keep simple for now)
-	let sourceHtml = `<label class="filter-option"><input type="checkbox" name="source" value="all" checked>All</label>`;
+	let sourceHtml = `<label class="filter-option"><input type="checkbox" name="source" value="all" ${
+		Array.isArray(window.selectedSources) &&
+		window.selectedSources.length > 0
+			? ''
+			: 'checked'
+	}>All</label>`;
 	sources.forEach((source) => {
 		const label =
 			source.charAt(0).toUpperCase() + source.slice(1).replace('-', ' ');
-		sourceHtml += `<label class="filter-option"><input type="checkbox" name="source" value="${source}"><span>${label}</span></label>`;
+		const isChecked =
+			Array.isArray(window.selectedSources) &&
+			window.selectedSources.includes(source)
+				? 'checked'
+				: '';
+		sourceHtml += `<label class="filter-option"><input type="checkbox" name="source" value="${source}" ${isChecked}><span>${label}</span></label>`;
 	});
 	sourceDiv.innerHTML = sourceHtml;
 
@@ -2614,6 +2634,21 @@ window.onload = async () => {
 
 	// Load referral fee rules FIRST for calculation
 	await fetchReferralFeeRules();
+
+	// Handle deep links from insight: ?tab=bestsellers&source=best-sellers|new-releases&categoryId=...
+	const tabParam = getQueryParam('tab');
+	const sourceParam = getQueryParam('source');
+	const categoryIdParam = getQueryParam('categoryId');
+
+	if (tabParam === 'bestsellers') {
+		await switchTab('bestsellers');
+		// Activate source filter
+		if (sourceParam === 'best-sellers' || sourceParam === 'new-releases') {
+			window.selectedSources = [sourceParam];
+		}
+	} else {
+		await switchTab('regular');
+	}
 
 	await loadSidebar();
 	await loadProducts();

@@ -14,10 +14,12 @@
 
 		<style>
 			:root {
-				--heatmap-green: #22c55e;
-				--heatmap-red: #ef4444;
-				--heatmap-yellow: #facc15;
-				--heatmap-orange: #ff9f43;
+				/* Google Sheet-like calm palette */
+				--heatmap-green: #56bb8a; /* best */
+				--heatmap-olive: #abc978; /* mid-high */
+				--heatmap-yellow: #fed565; /* mid */
+				--heatmap-orange: #f3a96c; /* mid-low */
+				--heatmap-red: #e67b73; /* worst */
 				--primary-orange: #ff7a00;
 				--primary-orange-hover: #e66a00;
 				--primary-orange-light: #fff4e6;
@@ -373,6 +375,7 @@
 					var(--heatmap-red),
 					var(--heatmap-orange),
 					var(--heatmap-yellow),
+					var(--heatmap-olive),
 					var(--heatmap-green)
 				);
 				border: 1px solid #eee;
@@ -639,6 +642,12 @@
 				{ code: 'acos', name: 'ACOS (%)', unit: 'pct' },
 				{ code: 'tacos', name: 'TACOS (%)', unit: 'pct' },
 				{ code: 'cpp', name: 'CPP ($)', unit: 'usd' },
+				{
+					code: 'organic_sales_pct',
+					name: 'Organic Sales (%)',
+					unit: 'pct',
+				},
+				{ code: 'fulfillment_fbm', name: 'FBM (%)', unit: 'pct' },
 
 				// LOWER IS BETTER metrics
 				{
@@ -666,6 +675,23 @@
 			let allCategories = [];
 			let allCategoryData = new Map(); // categoryId -> data
 			let currentSortMonth = null; // Track which month is currently being sorted by
+			let sortDirection = null; // 'desc' | 'asc' | null (no sort)
+			const DEBUG_HEATMAP = true;
+			function dlog(...args) {
+				if (DEBUG_HEATMAP) console.log('[heatmap]', ...args);
+			}
+
+			function coerceNumber(val) {
+				if (typeof val === 'number' && isFinite(val)) return val;
+				if (typeof val === 'string') {
+					const s = val.trim().replace('%', '');
+					const n = parseFloat(s);
+					const out = isNaN(n) ? null : n;
+					if (s.endsWith('%')) dlog('coerce %', val, '=>', out);
+					return out;
+				}
+				return null;
+			}
 
 			function getQueryParam(name) {
 				const url = new URL(window.location.href);
@@ -773,12 +799,14 @@
 					'roi',
 					'roas',
 					'potential_score',
+					'fba_fee', // per request: higher FBA fee shown greener
+					'organic_sales_pct',
+					'fulfillment_fbm',
 				];
 
 				const LOWER_IS_BETTER = [
 					'listing_concentration',
 					'referral_fee',
-					'fba_fee',
 					'cogs_cap',
 					'acos',
 					'tacos',
@@ -812,48 +840,46 @@
 
 				// Calculate percentile ranges for this column
 				const range = maxValue - minValue;
-				const p25 = minValue + range * 0.25;
-				const p50 = minValue + range * 0.5;
-				const p75 = minValue + range * 0.75;
+				const p20 = minValue + range * 0.2;
+				const p40 = minValue + range * 0.4;
+				const p60 = minValue + range * 0.6;
+				const p80 = minValue + range * 0.8;
 
 				// Determine color based on metric type and value position within this column
 				let bg, fg;
 
 				if (HIGHER_IS_BETTER.includes(metricCode)) {
 					// Higher is better: Green = high, Red = low
-					if (value <= p25) {
-						// Bottom 25% - Red (worst)
+					if (value <= p20) {
 						bg = 'var(--heatmap-red)';
 						fg = 'var(--heatmap-text)';
-					} else if (value <= p50) {
-						// 25-50% - Orange
+					} else if (value <= p40) {
 						bg = 'var(--heatmap-orange)';
 						fg = 'var(--heatmap-text)';
-					} else if (value <= p75) {
-						// 50-75% - Yellow
+					} else if (value <= p60) {
 						bg = 'var(--heatmap-yellow)';
 						fg = 'var(--heatmap-text)';
+					} else if (value <= p80) {
+						bg = 'var(--heatmap-olive)';
+						fg = 'var(--heatmap-text)';
 					} else {
-						// Top 25% - Green (best)
 						bg = 'var(--heatmap-green)';
 						fg = 'var(--heatmap-text)';
 					}
 				} else if (LOWER_IS_BETTER.includes(metricCode)) {
-					// Lower is better: Green = low, Red = high
-					if (value <= p25) {
-						// Bottom 25% - Green (best)
+					if (value <= p20) {
 						bg = 'var(--heatmap-green)';
 						fg = 'var(--heatmap-text)';
-					} else if (value <= p50) {
-						// 25-50% - Yellow
+					} else if (value <= p40) {
+						bg = 'var(--heatmap-olive)';
+						fg = 'var(--heatmap-text)';
+					} else if (value <= p60) {
 						bg = 'var(--heatmap-yellow)';
 						fg = 'var(--heatmap-text)';
-					} else if (value <= p75) {
-						// 50-75% - Orange
+					} else if (value <= p80) {
 						bg = 'var(--heatmap-orange)';
 						fg = 'var(--heatmap-text)';
 					} else {
-						// Top 25% - Red (worst)
 						bg = 'var(--heatmap-red)';
 						fg = 'var(--heatmap-text)';
 					}
@@ -934,10 +960,10 @@
 					'Rendering heatmap, selectedCategories:',
 					Array.from(selectedCategories)
 				);
-				console.log(
-					'allCategoryData keys:',
-					Array.from(allCategoryData.keys())
-				);
+				// console.log(
+				// 	'allCategoryData keys:',
+				// 	Array.from(allCategoryData.keys())
+				// );
 
 				if (selectedCategories.size === 0) {
 					container.innerHTML =
@@ -1015,10 +1041,15 @@
 						const hit = ts.timeSeries.find(
 							(p) => p.bucket === bucket
 						);
-						if (hit && typeof hit.value === 'number')
-							return hit.value;
+						if (hit && hit.value != null) return hit.value;
+						// If only an 'overall' value exists (e.g., FBM from Fulfillment), use it across months
+						const overall = ts.timeSeries.find(
+							(p) => p.bucket === 'overall'
+						);
+						if (overall && overall.value != null)
+							return overall.value;
 					}
-					// Category-level constant for FBA
+					// Category-level constant for FBA (apply across months)
 					if (
 						metricCode === 'fba_fee' &&
 						data?.category?.fbaFeeUsd != null
@@ -1026,17 +1057,38 @@
 						const v = Number(data.category.fbaFeeUsd);
 						if (!Number.isNaN(v)) return v;
 					}
-					// Fallback to metricsSummary ONLY when month matches exactly
+					// Fallback to metricsSummary – mirror cell rendering behavior (avoid forcing same value across months)
 					if (Array.isArray(data?.metricsSummary)) {
 						const ms = data.metricsSummary.find(
 							(x) => x.metric === metricCode
 						);
-						if (
-							ms &&
-							typeof ms.latestValue === 'number' &&
-							ms.latestBucket === bucket
-						) {
-							return ms.latestValue;
+						if (ms && typeof ms.latestValue === 'number') {
+							// referral_fee: use latest across months
+							if (metricCode === 'referral_fee') {
+								return ms.latestValue;
+							}
+							// Generic: if latestBucket equals requested or is overall/top10, accept
+							if (
+								ms.latestBucket === bucket ||
+								ms.latestBucket === 'overall' ||
+								ms.latestBucket === 'top10' ||
+								!ms.latestBucket
+							) {
+								return ms.latestValue;
+							}
+						}
+					}
+					// Legacy datasets overall
+					if (Array.isArray(data?.datasets)) {
+						for (const ds of data.datasets) {
+							const arr = ds.metrics?.[metricCode];
+							if (Array.isArray(arr)) {
+								const ov = arr.find(
+									(m) => m.bucket === 'overall'
+								);
+								if (ov && typeof ov.value === 'number')
+									return ov.value;
+							}
 						}
 					}
 					return null;
@@ -1056,15 +1108,35 @@
 							);
 							if (metricData && metricData.timeSeries) {
 								metricData.timeSeries.forEach((ts) => {
+									const val = coerceNumber(ts.value);
 									if (
-										typeof ts.value === 'number' &&
+										val != null &&
+										isFinite(val) &&
 										buckets.includes(ts.bucket)
 									) {
 										valuesByCategoryAndMetric[categoryId][
 											def.code
-										].push(ts.value);
+										].push(val);
 									}
 								});
+								// If no month-aligned values but an 'overall' exists, spread it across buckets for color mapping
+								if (
+									valuesByCategoryAndMetric[categoryId][
+										def.code
+									].length === 0
+								) {
+									const overall = metricData.timeSeries.find(
+										(p) => p.bucket === 'overall'
+									);
+									const ov = coerceNumber(overall?.value);
+									if (ov != null && isFinite(ov)) {
+										buckets.forEach(() => {
+											valuesByCategoryAndMetric[
+												categoryId
+											][def.code].push(ov);
+										});
+									}
+								}
 							}
 
 							// Fallbacks when no series
@@ -1182,17 +1254,60 @@
 				});
 
 				// Sort categories based on selected metrics
-				const sortedCategoryIds = Array.from(selectedCategories).sort(
-					(a, b) => {
+				const sortedCategoryIds = (() => {
+					const base = Array.from(selectedCategories);
+					// No sort requested → keep insertion order
+					if (!currentSortMonth || !sortDirection) return base;
+
+					// Determine primary metric used for sorting (same logic as comparator)
+					let primaryCode = null;
+					for (let i = selectedOrder.length - 1; i >= 0; i--) {
+						const code = selectedOrder[i];
+						if (selected.has(code)) {
+							primaryCode = code;
+							break;
+						}
+					}
+					if (!primaryCode && selectedDefs.length) {
+						primaryCode = selectedDefs[0].code;
+					}
+					// Debug: dump values per category used for sort
+					try {
+						const debugValues = base.map((catId) => {
+							const d = allCategoryData.get(catId);
+							const v = coerceNumber(
+								getMetricValueForBucket(
+									d,
+									primaryCode,
+									currentSortMonth
+								)
+							);
+							return {
+								category: d?.category?.name,
+								metric: primaryCode,
+								month: currentSortMonth,
+								value: v,
+							};
+						});
+						if (typeof console !== 'undefined' && console.table) {
+							dlog('values before sort');
+							console.table(debugValues);
+						} else {
+							dlog('values before sort', debugValues);
+						}
+					} catch (e) {
+						dlog('debug dump error', e);
+					}
+
+					return base.sort((a, b) => {
 						const dataA = allCategoryData.get(a);
 						const dataB = allCategoryData.get(b);
-
 						if (!dataA || !dataB) return 0;
 
-						// Determine primary metric to sort by: first in user-selected order if available,
-						// otherwise fallback to first selected in list
+						// Determine primary metric: most recently clicked selected metric
 						let primaryCode = null;
-						for (const code of selectedOrder) {
+						for (let i = selectedOrder.length - 1; i >= 0; i--) {
+							const code = selectedOrder[i];
 							if (selected.has(code)) {
 								primaryCode = code;
 								break;
@@ -1203,59 +1318,61 @@
 						}
 						if (!primaryCode) return 0;
 
-						// Get value for primary metric - either from specific month or latest
 						const getValueForMetric = (
 							data,
 							metricCode,
-							targetMonth = null
+							targetMonth
 						) => {
 							const byMetric = {};
 							(data.timeSeriesData || []).forEach(
 								(m) => (byMetric[m.metric] = m)
 							);
-
 							const metricData = byMetric[metricCode];
 							if (!metricData || !metricData.timeSeries)
 								return null;
-
-							// If specific month requested, get that month's value
 							if (targetMonth) {
 								const monthData = metricData.timeSeries.find(
 									(ts) => ts.bucket === targetMonth
 								);
-								return monthData ? monthData.value : null;
+								return monthData
+									? coerceNumber(monthData.value)
+									: null;
 							}
-
-							// Otherwise find latest month value
 							const latestMonth = metricData.timeSeries
 								.filter((ts) => /^\d{4}-\d{2}$/.test(ts.bucket))
 								.sort((a, b) =>
 									b.bucket.localeCompare(a.bucket)
 								)[0];
-
-							return latestMonth ? latestMonth.value : null;
+							return latestMonth
+								? coerceNumber(latestMonth.value)
+								: null;
 						};
 
-						const valueA = getValueForMetric(
-							dataA,
-							primaryCode,
-							currentSortMonth
+						// Prefer value directly from cell computation helper to inherit fallbacks
+						const valueA = coerceNumber(
+							getMetricValueForBucket(
+								dataA,
+								primaryCode,
+								currentSortMonth
+							)
 						);
-						const valueB = getValueForMetric(
-							dataB,
-							primaryCode,
-							currentSortMonth
+						const valueB = coerceNumber(
+							getMetricValueForBucket(
+								dataB,
+								primaryCode,
+								currentSortMonth
+							)
 						);
 
-						// Handle null values
 						if (valueA == null && valueB == null) return 0;
-						if (valueA == null) return 1; // null values go to bottom
+						if (valueA == null) return 1;
 						if (valueB == null) return -1;
 
-						// Sort descending (high to low)
-						return valueB - valueA;
-					}
-				);
+						return sortDirection === 'asc'
+							? valueA - valueB
+							: valueB - valueA;
+					});
+				})();
 
 				sortedCategoryIds.forEach((categoryId) => {
 					const data = allCategoryData.get(categoryId);
@@ -1266,9 +1383,8 @@
 						(m) => (byMetric[m.metric] = m)
 					);
 
-					const availableCount = selectedDefs.filter(
-						(def) => (byMetric[def.code]?.timeSeries || []).length
-					).length;
+					// Count metrics selected by the user (not only those with data)
+					const selectedCount = selectedDefs.length;
 
 					// Create category group with proper styling
 					const categoryGroupRows = [];
@@ -1389,14 +1505,15 @@
 									valuesByCategoryAndMetric[categoryId][
 										def.code
 									] || [];
+								const vNum = coerceNumber(v);
 								const { bg, fg } = mapMetricColor(
 									def.code,
-									v,
+									vNum,
 									rowValues
 								);
 								const label = formatMetricValue(
 									def.code,
-									v,
+									vNum,
 									def.unit
 								);
 								return `<div class="heatmap-cell"><span class="heatmap-value" style="background:${bg};color:${fg};border: 1px solid ${bg}">${
@@ -1410,8 +1527,8 @@
 							index === 0
 								? `<div class="heatmap-cell category">${
 										data.category?.name || ''
-								  }<div style="color:#999;font-size:11px;font-weight:400;margin-top:2px">${availableCount} metric${
-										availableCount === 1 ? '' : 's'
+								  }<div style="color:#999;font-size:11px;font-weight:400;margin-top:2px">${selectedCount} metric${
+										selectedCount === 1 ? '' : 's'
 								  }</div></div>`
 								: '<div class="heatmap-cell"></div>';
 
@@ -1434,26 +1551,51 @@
 			}
 
 			function updateSortIndicators() {
-				// Remove active class from all sortable headers
+				// Reset all headers
 				document
 					.querySelectorAll('.heatmap-cell.header.sortable')
 					.forEach((header) => {
 						header.classList.remove('active');
+						const icon = header.querySelector('.sort-icon');
+						if (icon) {
+							icon.textContent = '';
+							icon.style.display = 'none';
+						}
 					});
 
-				// Add active class to current sort month
-				if (currentSortMonth) {
+				// Set active header and icon
+				if (currentSortMonth && sortDirection) {
 					const activeHeader = document.querySelector(
 						`[data-month="${currentSortMonth}"]`
 					);
 					if (activeHeader) {
 						activeHeader.classList.add('active');
+						const icon = activeHeader.querySelector('.sort-icon');
+						if (icon) {
+							icon.textContent =
+								sortDirection === 'asc' ? '↑' : '↓';
+							icon.style.display = 'inline';
+						}
 					}
 				}
 			}
 
 			function sortByMonth(month) {
-				currentSortMonth = month;
+				if (currentSortMonth !== month) {
+					// Click 1 on new month: set to desc
+					currentSortMonth = month;
+					sortDirection = 'desc';
+				} else if (sortDirection === 'desc') {
+					// Click 2: desc -> asc
+					sortDirection = 'asc';
+				} else if (sortDirection === 'asc') {
+					// Click 3: clear
+					currentSortMonth = null;
+					sortDirection = null;
+				} else {
+					// If somehow month matches but direction cleared, start at desc
+					sortDirection = 'desc';
+				}
 				renderHeatmap();
 			}
 
@@ -1522,7 +1664,21 @@
 							${isSelected ? 'checked' : ''}
 							onchange="toggleCategory('${category._id}')"
 						/>
-						<div class="category-name" title="${category.name}">${category.name}</div>
+						<div class="category-name" title="${
+							category.name
+						}" oncontextmenu="openContextMenu(event, '${
+						category._id
+					}')">${category.name}</div>
+						<div style="margin-left:auto; position: relative;">
+							<div class="mini-menu" style="display:none; position:absolute; right:0; top:24px; background:#111; color:#fff; border-radius:8px; padding:6px 0; min-width:160px; box-shadow: 0 8px 20px rgba(0,0,0,0.25);">
+								<div class="mini-item" onclick="openBoard('${
+									category._id
+								}', 'best-sellers')" style="padding:8px 12px; cursor:pointer;">Best-seller</div>
+								<div class="mini-item" onclick="openBoard('${
+									category._id
+								}', 'new-releases')" style="padding:8px 12px; cursor:pointer;">New Release</div>
+							</div>
+						</div>
 					`;
 
 					// Also handle click on the entire item
@@ -1726,6 +1882,33 @@
 			// Init
 			renderMetricChips();
 			loadCategory();
+
+			// Mini dropdown helpers
+			window.openContextMenu = function (e, categoryId) {
+				e.preventDefault();
+				const parent = e.target.closest('.category-item');
+				if (!parent) return;
+				// close others
+				document
+					.querySelectorAll('.mini-menu')
+					.forEach((m) => (m.style.display = 'none'));
+				const menu = parent.querySelector('.mini-menu');
+				if (!menu) return;
+				menu.style.display = 'block';
+			};
+			window.openBoard = function (categoryId, source) {
+				const url = `/dashboard/dashboard.html?tab=bestsellers&source=${encodeURIComponent(
+					source
+				)}&categoryId=${encodeURIComponent(categoryId)}`;
+				window.open(url, '_blank');
+			};
+			document.addEventListener('click', (e) => {
+				if (!e.target.closest('.mini-menu')) {
+					document
+						.querySelectorAll('.mini-menu')
+						.forEach((m) => (m.style.display = 'none'));
+				}
+			});
 
 			// Search wiring
 			const searchInput = document.getElementById('categorySearchInput');

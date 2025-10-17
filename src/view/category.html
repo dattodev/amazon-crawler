@@ -18,6 +18,25 @@
 				justify-content: space-between;
 				margin-bottom: 16px;
 			}
+			.toolbar {
+				display: flex;
+				gap: 8px;
+				align-items: center;
+				flex-wrap: wrap;
+			}
+			.toolbar input[type='text'] {
+				padding: 8px 10px;
+				border: 1px solid #dcdcdc;
+				border-radius: 8px;
+				min-width: 260px;
+			}
+			.pagination {
+				display: flex;
+				gap: 8px;
+				align-items: center;
+				justify-content: flex-end;
+				margin-top: 8px;
+			}
 			.card {
 				background: #fff;
 				border: 1px solid #e6e6e6;
@@ -207,8 +226,39 @@
 			</div>
 
 			<div class="card">
-				<h3 style="margin-top: 0">Categories & Datasets</h3>
-				<div id="catList"></div>
+				<div
+					style="
+						display: flex;
+						align-items: center;
+						justify-content: space-between;
+						gap: 12px;
+						flex-wrap: wrap;
+					"
+				>
+					<h3 style="margin: 0">Categories</h3>
+					<div class="toolbar">
+						<input
+							id="catSearch"
+							type="text"
+							placeholder="Search categories..."
+						/>
+						<select
+							id="catPageSize"
+							style="
+								padding: 6px 8px;
+								border: 1px solid #ddd;
+								border-radius: 6px;
+							"
+						>
+							<option value="10">10</option>
+							<option value="20" selected>20</option>
+							<option value="50">50</option>
+							<option value="100">100</option>
+						</select>
+					</div>
+				</div>
+				<div id="catList" style="margin-top: 8px"></div>
+				<div id="catPager" class="pagination"></div>
 				<input
 					id="rowUploadFile"
 					type="file"
@@ -216,11 +266,6 @@
 					multiple
 					style="display: none"
 				/>
-				<div
-					id="datasetList"
-					class="hint"
-					style="margin-top: 10px"
-				></div>
 			</div>
 		</div>
 
@@ -330,7 +375,71 @@
 						&times;
 					</button>
 				</div>
+
 				<div id="resultsContent"></div>
+			</div>
+		</div>
+
+		<!-- Datasets Management Modal (moved outside Results modal) -->
+		<div
+			id="datasetModal"
+			style="
+				display: none;
+				position: fixed;
+				inset: 0;
+				background: rgba(0, 0, 0, 0.5);
+				z-index: 1002;
+			"
+		>
+			<div
+				style="
+					position: absolute;
+					top: 50%;
+					left: 50%;
+					transform: translate(-50%, -50%);
+					background: #fff;
+					border-radius: 10px;
+					max-width: 1000px;
+					width: 92%;
+					max-height: 90%;
+					overflow: auto;
+					padding: 16px;
+				"
+			>
+				<div
+					style="
+						display: flex;
+						align-items: center;
+						justify-content: space-between;
+						gap: 8px;
+						margin-bottom: 8px;
+					"
+				>
+					<h3 id="datasetModalTitle" style="margin: 0">Datasets</h3>
+					<div style="display: flex; gap: 8px; align-items: center">
+						<button
+							onclick="triggerRowUpload(currentCategorySlug)"
+							class="btn-primary"
+							style="padding: 6px 10px"
+						>
+							Upload Excel
+						</button>
+						<button
+							onclick="closeDatasetModal()"
+							style="
+								background: none;
+								border: 1px solid #ddd;
+								padding: 4px 10px;
+								border-radius: 8px;
+								font-size: 16px;
+								cursor: pointer;
+							"
+						>
+							&times;
+						</button>
+					</div>
+				</div>
+				<div id="datasetContainer" class="hint"></div>
 			</div>
 		</div>
 
@@ -340,33 +449,124 @@
 				return r.ok ? await r.json() : [];
 			}
 
+			// Table-based category renderer with pagination
+			let allCategories = [];
+			let filteredCategories = [];
+			let catPage = 1;
 			function renderCategoryList(items) {
+				allCategories = Array.isArray(items) ? items : [];
+				applyCategoryFiltersAndRender();
+			}
+			function applyCategoryFiltersAndRender() {
 				const el = document.getElementById('catList');
-				if (!items.length) {
-					el.innerHTML = '<p class="muted">No categories yet.</p>';
+				const pager = document.getElementById('catPager');
+				const q = (document.getElementById('catSearch')?.value || '')
+					.toLowerCase()
+					.trim();
+				const pageSize =
+					parseInt(
+						document.getElementById('catPageSize')?.value || '20',
+						10
+					) || 20;
+				filteredCategories = q
+					? allCategories.filter(
+							(c) =>
+								String(c.name).toLowerCase().includes(q) ||
+								String(c.slug).toLowerCase().includes(q)
+					  )
+					: allCategories.slice();
+				const total = filteredCategories.length;
+				const pages = Math.max(1, Math.ceil(total / pageSize));
+				if (catPage > pages) catPage = pages;
+				const start = (catPage - 1) * pageSize;
+				const pageItems = filteredCategories.slice(
+					start,
+					start + pageSize
+				);
+
+				if (!pageItems.length) {
+					el.innerHTML = '<p class="muted">No categories found.</p>';
+					pager.innerHTML = '';
 					return;
 				}
-				// Render per-category cards (no global weight/volume inputs)
-				const cards = items
-					.map((c) => {
-						return `
-							<div class="card" style="margin-top:12px;">
-								<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
-									<div>
-										<div style="font-weight:700;font-size:1rem;">${c.name}</div>
-										<div class="muted"><code>${c.slug}</code></div>
-									</div>
-									<div style="display:flex;gap:8px;flex-wrap:wrap;">
-										<button class="btn-primary" style="padding:6px 10px;font-size:0.8rem;" onclick="triggerRowUpload('${c.slug}')">Upload Excel</button>
-										<button style="background:#555;color:#fff;border:none;padding:6px 10px;border-radius:8px;font-size:0.8rem" onclick="loadDatasets('${c.slug}')">View Datasets</button>
-										<button style="background:#c62828;color:#fff;border:none;padding:6px 10px;border-radius:8px;font-size:0.8rem" onclick="deleteCategory('${c._id}', '${c.slug}')">Delete</button>
-									</div>
-								</div>
-							</div>
-						`;
-					})
+
+				const rows = pageItems
+					.map(
+						(c, idx) => `
+                        <tr>
+                            <td>${start + idx + 1}</td>
+                            <td>
+                                <div style="font-weight:600">${c.name}</div>
+                                <div class="muted"><code>${c.slug}</code></div>
+                            </td>
+                            <td>${new Date(
+								c.createdAt || c._id?.toString().slice(0, 8)
+							).toLocaleString()}</td>
+                            <td>
+                                <div style="display:flex;gap:6px;flex-wrap:wrap">
+                                    <button class="btn-primary" style="padding:6px 10px;font-size:0.8rem;" onclick="triggerRowUpload('${
+										c.slug
+									}')">Upload Excel</button>
+                                    <button style="background:#455a64;color:#fff;border:none;padding:6px 10px;border-radius:8px;font-size:0.8rem" onclick="loadDatasets('${
+										c.slug
+									}')">Manage Datasets</button>
+                                    <button style="background:#c62828;color:#fff;border:none;padding:6px 10px;border-radius:8px;font-size:0.8rem" onclick="deleteCategory('${
+										c._id
+									}', '${c.slug}')">Delete</button>
+                                </div>
+                            </td>
+                        </tr>`
+					)
 					.join('');
-				el.innerHTML = cards;
+				el.innerHTML = `<table class="cat-table"><thead><tr><th>#</th><th>Category</th><th>Created</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`;
+
+				// pager
+				pager.innerHTML = `
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <button ${
+							catPage <= 1 ? 'disabled' : ''
+						} onclick="changeCatPage(${
+					catPage - 1
+				})" class="btn-primary" style="padding:6px 10px;${
+					catPage <= 1 ? 'opacity:.6;cursor:not-allowed;' : ''
+				}">Prev</button>
+                        <span class="muted">Page ${catPage} / ${pages} — ${total} items</span>
+                        <button ${
+							catPage >= pages ? 'disabled' : ''
+						} onclick="changeCatPage(${
+					catPage + 1
+				})" class="btn-primary" style="padding:6px 10px;${
+					catPage >= pages ? 'opacity:.6;cursor:not-allowed;' : ''
+				}">Next</button>
+                    </div>`;
+			}
+			function changeCatPage(p) {
+				catPage = Math.max(1, p);
+				applyCategoryFiltersAndRender();
+			}
+
+			// Controls: search + page size
+			function bindCategoryControls() {
+				const search = document.getElementById('catSearch');
+				const sizeSel = document.getElementById('catPageSize');
+				if (search && !search.__bound) {
+					let t;
+					search.addEventListener('input', () => {
+						clearTimeout(t);
+						t = setTimeout(() => {
+							catPage = 1;
+							applyCategoryFiltersAndRender();
+						}, 200);
+					});
+					search.__bound = true;
+				}
+				if (sizeSel && !sizeSel.__bound) {
+					sizeSel.addEventListener('change', () => {
+						catPage = 1;
+						applyCategoryFiltersAndRender();
+					});
+					sizeSel.__bound = true;
+				}
 			}
 
 			async function refresh() {
@@ -375,16 +575,24 @@
 					'<div class="loading-wrap"><div class="spinner"></div><div>Loading categories...</div></div>';
 				const items = await fetchCategories();
 				renderCategoryList(items);
-				if (items.length) {
-					await loadDatasets(items[0].slug);
-				}
+				// bind search + page size on first render
+				bindCategoryControls();
 			}
 
 			async function loadDatasets(slug) {
 				try {
 					currentCategorySlug = slug;
-					// show loading in dataset area
-					document.getElementById('datasetList').innerHTML =
+					// find name for title if available
+					const cat = (allCategories || []).find(
+						(c) => c.slug === slug
+					);
+					openDatasetModal(null, slug, cat?.name);
+					try {
+						console.log('[cat] loadDatasets', slug);
+					} catch {}
+					const container =
+						document.getElementById('datasetContainer');
+					container.innerHTML =
 						'<div class="loading-wrap"><div class="spinner"></div><div>Loading datasets...</div></div>';
 					const r = await fetch(
 						`/api/research/datasets?categorySlug=${encodeURIComponent(
@@ -392,7 +600,7 @@
 						)}`
 					);
 					const data = r.ok ? await r.json() : null;
-					const el = document.getElementById('datasetList');
+					const el = container;
 					if (!data || !data.datasets || !data.datasets.length) {
 						el.innerHTML =
 							'<p class="muted">No datasets yet for this category.</p>';
@@ -434,65 +642,152 @@
 						})
 					);
 
-					const rows = enriched
-						.map(
-							(d, i) => `
-                                <tr>
-                                    <td>${i + 1}</td>
-                                    <td>${
-										d.originalFilename.length > 40
-											? d.originalFilename.substring(
-													0,
-													40
-											  ) + '...'
-											: d.originalFilename
-									}</td>
-                                    <td>${d.timeRange?.from || '-'}</td>
-                                    <td>
-                                        <input id="w_${
+					// Split datasets into two tabs
+					const isKWName = (name) =>
+						/keywordmining-us/i.test(String(name || ''));
+					const monthly = enriched.filter(
+						(d) => !isKWName(d.originalFilename)
+					);
+					const kw = enriched.filter((d) =>
+						isKWName(d.originalFilename)
+					);
+
+					const renderRow = (d, i, withInputs) => {
+						const weightCell = withInputs
+							? `<input id="w_${
+									d.id
+							  }" type="number" step="0.01" placeholder="e.g. 0.25" value="${
+									d.weight ?? ''
+							  }" style="width:110px;padding:6px 8px;border:1px solid #ddd;border-radius:6px" />`
+							: '<span class="muted">—</span>';
+						const volumeCell = withInputs
+							? `<input id="v_${
+									d.id
+							  }" type="number" step="0.01" placeholder="e.g. 64.5" value="${
+									d.volume ?? ''
+							  }" style="width:110px;padding:6px 8px;border:1px solid #ddd;border-radius:6px" />`
+							: '<span class="muted">—</span>';
+						const saveBtn = withInputs
+							? `<button onclick=\"saveMonthlyDims('${d.id}')\" style=\"background:#2e7d32;color:#fff;border:none;padding:4px 8px;border-radius:8px;font-size:0.8rem\">Save</button>`
+							: '';
+						const fname = String(d.originalFilename || '');
+						const short =
+							fname.length > 40
+								? fname.substring(0, 40) + '...'
+								: fname;
+						return `
+                            <tr>
+                                <td>${i + 1}</td>
+                                <td>${short}</td>
+                                <td>${d.timeRange?.from || '-'}</td>
+                                <td>${weightCell}</td>
+                                <td>${volumeCell}</td>
+                                <td><span id=\"f_${d.id}\">${
+							d.fbaFee != null
+								? '$' + Number(d.fbaFee).toFixed(2)
+								: '—'
+						}</span></td>
+                                <td>
+                                    <div style=\"display:flex;align-items:center;gap:6px;flex-wrap:wrap\">
+                                        <button class=\"btn-primary\" onclick=\"selectSheet('${
 											d.id
-										}" type="number" step="0.01" placeholder="e.g. 0.25" value="${
-								d.weight ?? ''
-							}" style="width:110px;padding:6px 8px;border:1px solid #ddd;border-radius:6px" />
-                                    </td>
-                                    <td>
-                                        <input id="v_${
+										}', '${fname}')\" style=\"padding: 4px 8px; font-size: 0.8rem;\">View</button>
+                                        <button onclick=\"deleteDataset('${
 											d.id
-										}" type="number" step="0.01" placeholder="e.g. 64.5" value="${
-								d.volume ?? ''
-							}" style="width:110px;padding:6px 8px;border:1px solid #ddd;border-radius:6px" />
-                                    </td>
-                                    <td>
-                                        <span id="f_${d.id}">${
-								d.fbaFee != null
-									? '$' + Number(d.fbaFee).toFixed(2)
-									: '—'
-							}</span>
-                                    </td>
-                                    <td>
-                                        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-                                            <button class="btn-primary" onclick="selectSheet('${
-												d.id
-											}', '${
-								d.originalFilename
-							}')" style="padding: 4px 8px; font-size: 0.8rem;">View</button>
-                                            <button onclick="deleteDataset('${
-												d.id
-											}')" style="background:#c62828;color:#fff;border:none;padding:4px 8px;border-radius:8px;font-size:0.8rem">Delete</button>
-                                            <button onclick="saveMonthlyDims('${
-												d.id
-											}')" style="background:#2e7d32;color:#fff;border:none;padding:4px 8px;border-radius:8px;font-size:0.8rem">Save</button>
-                                        </div>
-                                    </td>
-                                </tr>`
-						)
+										}')\" style=\"background:#c62828;color:#fff;border:none;padding:4px 8px;border-radius:8px;font-size:0.8rem\">Delete</button>
+                                        ${saveBtn}
+                                    </div>
+                                </td>
+                            </tr>`;
+					};
+
+					const monthlyRows = monthly
+						.map((d, i) => renderRow(d, i, true))
 						.join('');
-					el.innerHTML = `<table class="cat-table"><thead><tr><th>#</th><th>Filename</th><th>Month</th><th>Avg Weight (lb)</th><th>Avg Volume (in³)</th><th>FBA Fee</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table>`;
-					// Removed bottom CTA buttons (Compute COGS cap, Fix Bucket Format)
+					const kwRows = kw
+						.map((d, i) => renderRow(d, i, false))
+						.join('');
+
+					const tabsHtml = `
+                        <div style=\"display:flex;gap:8px;margin-bottom:8px;\">
+                            <button id=\"tab-monthly\" class=\"btn-primary\" style=\"padding:6px 10px;border:1px solid #ef6c00;border-radius:8px;\">Monthly datasets</button>
+                            <button id=\"tab-kw\" style=\"background:#fff;color:#333;border:1px solid #ddd;padding:6px 10px;border-radius:8px;\">KeywordMining datasets</button>
+                        </div>
+                        <div id=\"panel-monthly\">
+                            <table class=\"cat-table\"><thead><tr><th>#</th><th>Filename</th><th>Month</th><th>Avg Weight (lb)</th><th>Avg Volume (in³)</th><th>FBA Fee</th><th>Action</th></tr></thead><tbody>${
+								monthlyRows ||
+								'<tr><td colspan=\\"7\\" class=\\"muted\\">No monthly datasets</td></tr>'
+							}</tbody></table>
+                        </div>
+                        <div id=\"panel-kw\" style=\"display:none;\">
+                            <table class=\"cat-table\"><thead><tr><th>#</th><th>Filename</th><th>Month</th><th>Avg Weight (lb)</th><th>Avg Volume (in³)</th><th>FBA Fee</th><th>Action</th></tr></thead><tbody>${
+								kwRows ||
+								'<tr><td colspan=\\"7\\" class=\\"muted\\">No KeywordMining datasets</td></tr>'
+							}</tbody></table>
+                        </div>
+                    `;
+
+					el.innerHTML = tabsHtml;
+					const mBtn = document.getElementById('tab-monthly');
+					const kBtn = document.getElementById('tab-kw');
+					if (mBtn && kBtn) {
+						mBtn.onclick = () => switchDatasetTab('monthly');
+						kBtn.onclick = () => switchDatasetTab('kw');
+					}
 				} catch (e) {
-					document.getElementById('datasetList').innerHTML =
+					const container =
+						document.getElementById('datasetContainer');
+					container.innerHTML =
 						'<p class="muted">Failed to load datasets.</p>';
 				}
+			}
+
+			// Modal open/close for dataset management
+			function openDatasetModal(categoryId, slug, name) {
+				const modal = document.getElementById('datasetModal');
+				const title = document.getElementById('datasetModalTitle');
+				try {
+					console.log('[cat] openDatasetModal', { slug, name });
+				} catch {}
+				modal.style.display = 'block';
+				title.textContent = `Datasets — ${name || slug || ''}`;
+			}
+
+			// Simple tab switcher for dataset modal
+			function switchDatasetTab(which) {
+				const pm = document.getElementById('panel-monthly');
+				const pk = document.getElementById('panel-kw');
+				const bm = document.getElementById('tab-monthly');
+				const bk = document.getElementById('tab-kw');
+				if (!pm || !pk || !bm || !bk) return;
+				if (which === 'kw') {
+					pm.style.display = 'none';
+					pk.style.display = 'block';
+					bk.className = 'btn-primary';
+					bm.className = '';
+					bk.style.background = '#ef6c00';
+					bk.style.border = '1px solid #ef6c00';
+					bk.style.color = '#fff';
+					bm.style.background = '#fff';
+					bm.style.border = '1px solid #ddd';
+					bm.style.color = '#333';
+				} else {
+					pm.style.display = 'block';
+					pk.style.display = 'none';
+					bm.className = 'btn-primary';
+					bk.className = '';
+					bm.style.background = '#ef6c00';
+					bm.style.border = '1px solid #ef6c00';
+					bm.style.color = '#fff';
+					bk.style.background = '#fff';
+					bk.style.border = '1px solid #ddd';
+					bk.style.color = '#333';
+				}
+			}
+			function closeDatasetModal() {
+				const modal = document.getElementById('datasetModal');
+				document.getElementById('datasetContainer').innerHTML = '';
+				modal.style.display = 'none';
 			}
 
 			async function createCategory() {
@@ -586,6 +881,8 @@
 				// Auto-ingest standard sheets for this uploaded file
 				try {
 					await autoIngestStandardSheets(slug, file.name);
+					// refresh list in modal after auto-ingest
+					await loadDatasets(slug);
 				} catch (err) {
 					console.warn('Auto-ingest skipped:', err?.message || err);
 				}
@@ -1947,8 +2244,7 @@
 					await refresh();
 					if (slug && currentCategorySlug === slug) {
 						currentCategorySlug = null;
-						document.getElementById('datasetList').innerHTML =
-							'<p class="muted">Select a category</p>';
+						closeDatasetModal();
 					}
 				} catch (e) {
 					alert('Error deleting category: ' + e.message);

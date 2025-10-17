@@ -2511,6 +2511,12 @@ table td {
     display: none !important;
 }
 
+/* Grid robustness override: ensure columns fill available width */
+.product-list {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important;
+    overflow: visible;
+}
+
 /* Hide product badges/tags */
 .rank-badge,
 .fba-badge,

@@ -483,7 +483,8 @@ async function handleMarketAnalysisSheet(dataset, rows, header, res) {
 				const feeSum =
 					(Number(referralFeeValue) || 0) +
 					(Number(latestFbaFeeUsd) || 0);
-				const cogsCap = priceValue - (ads + feeSum + profitTarget);
+				// COGS is defined as 20% of Average Price
+				const cogsCap = 0.2 * priceValue;
 
 				// Profit uses assumed COGS = 20% price
 				const cogsAssumed = 0.2 * priceValue;
@@ -723,11 +724,12 @@ async function handleFulfillmentSheet(dataset, rows, header, res) {
 			// Normalize: if value is in 0-1, convert to percentage points
 			if (pct > 0 && pct <= 1) pct = pct * 100;
 
+			const bucket = dataset?.timeRange?.from || 'overall';
 			docs.push({
 				datasetId: dataset._id,
 				categoryId: dataset.categoryId,
 				metric: `fulfillment_${code}`,
-				bucket: 'overall',
+				bucket,
 				value: pct,
 				unit: 'pct',
 				sourceSheet: 'Fulfillment',
@@ -782,7 +784,7 @@ async function handlePublicationTimeSheet(dataset, rows, header, res) {
 		}
 
 		let totalPct = 0;
-		let newPct = 0;
+		let threeMonthsPct = null;
 		const detailRows = [];
 		for (let r = 1; r < rows.length; r++) {
 			const row = rows[r];
@@ -797,14 +799,13 @@ async function handlePublicationTimeSheet(dataset, rows, header, res) {
 			if (typeof pct !== 'number' || Number.isNaN(pct)) continue;
 			if (pct > 0 && pct <= 1) pct = pct * 100; // normalize if 0-1
 			totalPct += pct;
-			// New = month-based buckets only (exclude any year entries)
-			const isNew =
-				/\bmonth\b|\bmonths\b/.test(label) && !label.includes('year');
-			if (isNew) newPct += pct;
+			// Pick exactly '3 months' bucket as New Product Ratio
+			const isThreeMonths = label === '3 months' || label === '3 month';
+			if (isThreeMonths) threeMonthsPct = pct;
 			detailRows.push({
 				publicationTime: labelOriginal,
 				salesProportion: pct,
-				isNew,
+				isThreeMonths,
 			});
 		}
 
@@ -814,15 +815,18 @@ async function handlePublicationTimeSheet(dataset, rows, header, res) {
 				.json({ error: 'No valid Sales Proportion values found' });
 		}
 
-		// New product ratio (%) is the sum of Sales Proportion for month buckets
-		const ratio = newPct;
+		// New product ratio (%) is the Sales Proportion for the '3 months' bucket
+		const ratio = threeMonthsPct == null ? 0 : threeMonthsPct;
 
 		const docs = [
 			{
 				datasetId: dataset._id,
 				categoryId: dataset.categoryId,
 				metric: 'new_product_ratio',
-				bucket: 'overall',
+				bucket:
+					(dataset?.timeRange &&
+						(dataset.timeRange.from || dataset.timeRange.to)) ||
+					'overall',
 				value: ratio,
 				unit: 'pct',
 				sourceSheet: 'Publication Time',
@@ -976,12 +980,17 @@ async function handleListingConcentrationSheet(dataset, rows, header, res) {
 			}
 		}
 
+		// Use dataset month (YYYY-MM) as bucket so each file contributes its month's value
+		const bucketMonth =
+			(dataset?.timeRange &&
+				(dataset.timeRange.from || dataset.timeRange.to)) ||
+			'top10';
 		const docs = [
 			{
 				datasetId: dataset._id,
 				categoryId: dataset.categoryId,
 				metric: 'listing_concentration',
-				bucket: 'top10',
+				bucket: bucketMonth,
 				value: totalTop10,
 				unit: 'pct',
 				sourceSheet: 'Listing Concentration',
@@ -1393,6 +1402,10 @@ async function handleAdsMetricsSheet(dataset, rows, header, res) {
 			push('acos', acosCat, 'pct');
 			push('clickshare', clickShareCat, 'pct');
 			push('tacos', tacosCat, 'pct');
+			if (acosCat != null && tacosCat != null && acosCat !== 0) {
+				const organicSalesPct = (1 - tacosCat / acosCat) * 100;
+				push('organic_sales_pct', organicSalesPct, 'pct');
+			}
 			push('cpp', cppCat, 'usd');
 
 			processedRows = rowsToProcess.length;
@@ -2763,8 +2776,8 @@ router.post('/research/compute-cogs', async (req, res) => {
 		// Compute components
 		const ads = (avgPricePctAds / 100) * avgPrice;
 		const profitTarget = (targetProfitPct / 100) * avgPrice;
-		const fee = referralFee + fbaFee;
-		const cogsCap = avgPrice - (ads + fee + profitTarget);
+		const fee = referralFee + fbaFee; // kept for reference, not used in new cogs formula
+		const cogsCap = 0.2 * avgPrice;
 
 		// Save as metric cogs_cap (bucket: overall)
 		await ResearchSeries.updateOne(
@@ -3266,6 +3279,7 @@ router.get('/research/category/:id', async (req, res) => {
 		const roasSeries = [];
 		const acosSeries = [];
 		const tacosSeries = [];
+		const organicSalesSeries = [];
 		for (const b of derivedBuckets) {
 			const avgP = avgPriceByBucket[b]?.value;
 			if (typeof avgP !== 'number') continue;
@@ -3273,7 +3287,7 @@ router.get('/research/category/:id', async (req, res) => {
 			const cppVal = cppOverall;
 			const fee = (referral || 0) + (fbaFeeOverall || 0);
 			const profitTarget = 0.2 * avgP;
-			const cogs = avgP - (cppVal + fee + profitTarget);
+			const cogs = 0.2 * avgP; // new definition
 			const profit = avgP - (cppVal + fee + cogs);
 			const margin = avgP > 0 ? (profit / avgP) * 100 : 0;
 			const roi = cogs > 0 ? (profit / cogs) * 100 : 0;
@@ -3296,9 +3310,15 @@ router.get('/research/category/:id', async (req, res) => {
 			const acos = roas ? (1 / roas) * 100 : null;
 			const tacos =
 				acos != null && clickShare != null ? acos * clickShare : null;
+			const organicSalesPct =
+				acos != null && tacos != null && acos !== 0
+					? (1 - tacos / acos) * 100
+					: null;
 			if (roas != null) roasSeries.push({ bucket: b, value: roas });
 			if (acos != null) acosSeries.push({ bucket: b, value: acos });
 			if (tacos != null) tacosSeries.push({ bucket: b, value: tacos });
+			if (organicSalesPct != null)
+				organicSalesSeries.push({ bucket: b, value: organicSalesPct });
 		}
 		const injectDerived = (key, unit, series) => {
 			timeSeriesData[key] = {
@@ -3314,6 +3334,7 @@ router.get('/research/category/:id', async (req, res) => {
 		injectDerived('roas', 'ratio', roasSeries);
 		injectDerived('acos', 'pct', acosSeries);
 		injectDerived('tacos', 'pct', tacosSeries);
+		injectDerived('organic_sales_pct', 'pct', organicSalesSeries);
 
 		// Build comprehensive response
 		const response = {
@@ -3394,10 +3415,18 @@ router.post('/research/migrate-buckets', async (req, res) => {
 	try {
 		const { categoryId } = req.body;
 
-		// Find all series with invalid bucket format
+		// Find all series with invalid bucket format OR Fulfillment stored as 'overall'
 		const invalidBuckets = await ResearchSeries.find({
 			categoryId: categoryId,
-			bucket: { $regex: /^\d{3,4}$/ }, // Match 3-4 digit numbers like "2161", "950", "826"
+			$or: [
+				{ bucket: { $regex: /^\d{3,4}$/ } }, // Match 3-4 digit numbers like "2161", "950", "826"
+				{
+					$and: [
+						{ bucket: 'overall' },
+						{ sourceSheet: 'Fulfillment' },
+					],
+				},
+			],
 		}).lean();
 
 		if (invalidBuckets.length === 0) {
