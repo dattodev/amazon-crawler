@@ -1503,6 +1503,7 @@ input[type="checkbox"]:checked+span {
     font-size: 0.9rem;
     color: #333;
     line-height: 1.2;
+    text-transform: uppercase;
 }
 
 .rank-badge {
@@ -1583,6 +1584,9 @@ input[type="checkbox"]:checked+span {
     color: #333;
     margin-bottom: 16px;
     line-height: 1.3;
+    white-space: nowrap;
+    /* overflow: hidden; */
+    /* text-overflow: ellipsis; */
 
 }
 
@@ -2496,4 +2500,22 @@ table td {
     gap: 8px;
     justify-content: flex-end;
     margin-top: 8px;
+}
+
+/* Overrides: remove close icon on hover and product badges/tags */
+.product-card-v2 .delete-product-btn {
+    display: none !important;
+}
+
+.product-card-v2:hover .delete-product-btn {
+    display: none !important;
+}
+
+/* Hide product badges/tags */
+.rank-badge,
+.fba-badge,
+.fba-badge-v2,
+.fbm,
+.fba {
+    display: none !important;
 }

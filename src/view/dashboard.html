@@ -244,14 +244,34 @@
 									</div>
 								</div>
 
-								<!-- Quick Filter Dropdown -->
+								<!-- Filter Button -->
+								<button
+									class="filter-btn"
+									onclick="toggleFilterPanel()"
+								>
+									<svg
+										width="16"
+										height="16"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path
+											d="M3 6h18M7 12h10M10 18h4"
+										></path>
+									</svg>
+									<span>Filter</span>
+								</button>
+
+								<!-- Save Template Dropdown -->
 								<div class="dropdown">
 									<button
 										class="dropdown-btn"
 										onclick="toggleDropdown('quickFilter')"
 									>
 										<span id="quickFilterText"
-											>Quick Filter</span
+											>Save Template</span
 										>
 										<svg
 											width="12"
@@ -271,6 +291,43 @@
 										class="dropdown-content quick-filter-panel"
 									>
 										<div class="quick-filter-section">
+											<div
+												style="
+													display: flex;
+													justify-content: flex-end;
+													margin-bottom: 6px;
+												"
+											>
+												<button
+													class="reset-btn"
+													onclick="clearActiveTemplate()"
+												>
+													Clear template
+												</button>
+											</div>
+											<div
+												class="template-input-group"
+												style="
+													display: flex;
+													gap: 8px;
+													align-items: center;
+													margin-bottom: 8px;
+												"
+											>
+												<input
+													type="text"
+													id="templateName"
+													placeholder="Enter template name..."
+													class="template-input"
+													style="flex: 1"
+												/>
+												<button
+													class="save-template-btn"
+													onclick="saveCurrentFiltersAsTemplate()"
+												>
+													Save
+												</button>
+											</div>
 											<h4>Templates</h4>
 											<div
 												id="templateList"
@@ -281,26 +338,6 @@
 										</div>
 									</div>
 								</div>
-
-								<!-- Filter Button -->
-								<button
-									class="filter-btn"
-									onclick="toggleFilterPanel()"
-								>
-									<svg
-										width="16"
-										height="16"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="2"
-									>
-										<path
-											d="M3 6h18M7 12h10M10 18h4"
-										></path>
-									</svg>
-									<span>Filter & Sort</span>
-								</button>
 
 								<!-- Image Only Dropdown -->
 								<div class="dropdown">
@@ -901,7 +938,7 @@
 		<!-- Filter Panel -->
 		<div id="filterPanel" class="filter-panel">
 			<div class="filter-panel-header">
-				<h3>Filter & Sort</h3>
+				<h3>Filter</h3>
 				<button class="close-filter-btn" onclick="closeFilterPanel()">
 					<svg
 						width="20"
@@ -931,29 +968,6 @@
 					</div>
 					<div id="appliedFiltersTags" class="applied-filters-tags">
 						<!-- Applied filter tags will be inserted here -->
-					</div>
-				</div>
-
-				<!-- Template Section -->
-				<div class="template-section">
-					<div class="template-header">
-						<span>Save Template</span>
-					</div>
-					<div class="template-content">
-						<div class="template-input-group">
-							<input
-								type="text"
-								id="templateName"
-								placeholder="Enter template name..."
-								class="template-input"
-							/>
-							<button
-								class="save-template-btn"
-								onclick="saveCurrentFiltersAsTemplate()"
-							>
-								Save
-							</button>
-						</div>
 					</div>
 				</div>
 

@@ -2291,9 +2291,10 @@ async function applyTemplate(templateId) {
 	try {
 		const template = filterTemplates.find((t) => t._id === templateId);
 		if (!template) return;
+		const state = template.state || {};
 
-		// Set current filters to template values merged with defaults and sanitized
-		const raw = { ...template.filters };
+		// Restore filters (fallback to legacy template.filters)
+		const raw = { ...(state.filters || template.filters || {}) };
 		const merged = { ...DEFAULT_FILTERS, ...raw };
 		Object.keys(DEFAULT_FILTERS).forEach((k) => {
 			if (
@@ -2305,8 +2306,6 @@ async function applyTemplate(templateId) {
 			}
 		});
 		currentFilters = merged;
-
-		// Update radio buttons
 		Object.keys(currentFilters).forEach((filterKey) => {
 			const value = currentFilters[filterKey];
 			const radio = document.querySelector(
@@ -2314,28 +2313,62 @@ async function applyTemplate(templateId) {
 			);
 			if (radio) radio.checked = true;
 		});
-
-		// Update applied filters display
 		updateAppliedFilters();
 
-		// Set active template
+		// Restore seller/category/source selections
+		const setChecks = (name, values) => {
+			const inputs = document.querySelectorAll(`input[name="${name}"]`);
+			if (!inputs.length) return [];
+			const selected = new Set(Array.isArray(values) ? values : []);
+			let selectedValues = [];
+			inputs.forEach((i) => {
+				if (i.value === 'all') {
+					i.checked = selected.size === 0;
+				} else {
+					i.checked = selected.has(i.value);
+					if (i.checked) selectedValues.push(i.value);
+				}
+			});
+			return selectedValues;
+		};
+		window.selectedSellers = setChecks('seller', state.sellers);
+		window.selectedCategories = setChecks('category', state.categories);
+		window.selectedSources = setChecks('source', state.sources);
+
+		// Restore sort
+		if (state.sort) {
+			const sortOptions = {
+				'': 'Sort by',
+				price_asc: 'Price: Low to High',
+				price_desc: 'Price: High to Low',
+				date_asc: 'Date: Oldest to Newest',
+				date_desc: 'Date: Newest to Oldest',
+				bought_desc: 'Bought: High to Low',
+				bought_asc: 'Bought: Low to High',
+				rank_asc: 'Rank: Low to High',
+				rank_desc: 'Rank: High to Low',
+			};
+			const sortText = document.getElementById('sortText');
+			if (sortText)
+				sortText.textContent = sortOptions[state.sort] || 'Sort by';
+			await sortProducts(state.sort);
+		}
+
+		// Restore display mode and image-only
+		if (typeof state.imageOnlyCols === 'number') {
+			imageOnlyCols = state.imageOnlyCols;
+		}
+		if (state.displayMode) {
+			switchView(state.displayMode);
+		}
+
+		// Set active and refresh UI
 		activeTemplate = templateId;
-
-		// Re-render template list to show active state
 		renderTemplateList(filterTemplates);
-
-		// Close quick filter dropdown
 		const dropdown = document.getElementById('quickFilterDropdown');
 		if (dropdown) dropdown.classList.remove('show');
-
-		// Apply filters to products
-		applyFiltersToProducts();
-
-		// Update quick filter text
 		const quickFilterText = document.getElementById('quickFilterText');
-		if (quickFilterText) {
-			quickFilterText.textContent = template.name;
-		}
+		if (quickFilterText) quickFilterText.textContent = 'Save Template';
 	} catch (e) {
 		console.error('Error applying template:', e);
 		showError('Failed to apply template');
@@ -2362,6 +2395,32 @@ async function saveCurrentFiltersAsTemplate() {
 	}
 
 	try {
+		// Collect sidebar selections
+		const getCheckedValues = (name) =>
+			Array.from(
+				document.querySelectorAll(
+					`input[name="${name}"]:not([value="all"])`
+				)
+			)
+				.filter((i) => i.checked)
+				.map((i) => i.value);
+
+		// Map sort label to value
+		const sortTextLabel =
+			document.getElementById('sortText')?.textContent?.trim() || '';
+		const reverseSortMap = {
+			'Price: Low to High': 'price_asc',
+			'Price: High to Low': 'price_desc',
+			'Date: Oldest to Newest': 'date_asc',
+			'Date: Newest to Oldest': 'date_desc',
+			'Bought: High to Low': 'bought_desc',
+			'Bought: Low to High': 'bought_asc',
+			'Rank: Low to High': 'rank_asc',
+			'Rank: High to Low': 'rank_desc',
+			'Sort by': '',
+		};
+		const sortValue = reverseSortMap[sortTextLabel] ?? '';
+
 		const res = await fetch(
 			`${window.API_BASE_URL || ''}/api/filter-templates`,
 			{
@@ -2370,6 +2429,15 @@ async function saveCurrentFiltersAsTemplate() {
 				body: JSON.stringify({
 					name: templateName,
 					filters: currentFilters,
+					state: {
+						filters: currentFilters,
+						sellers: getCheckedValues('seller'),
+						categories: getCheckedValues('category'),
+						sources: getCheckedValues('source'),
+						sort: sortValue,
+						displayMode,
+						imageOnlyCols,
+					},
 					description: `Custom template: ${templateName}`,
 				}),
 			}
@@ -2549,6 +2617,11 @@ window.onload = async () => {
 
 	await loadSidebar();
 	await loadProducts();
+
+	// Apply default sort: Date: Newest to Oldest
+	const sortText = document.getElementById('sortText');
+	if (sortText) sortText.textContent = 'Date: Newest to Oldest';
+	await sortProducts('date_desc');
 	await loadFilterTemplates();
 };
 
@@ -3159,6 +3232,48 @@ window.saveCurrentFiltersAsTemplate = saveCurrentFiltersAsTemplate;
 window.applyTemplate = applyTemplate;
 window.deleteTemplate = deleteTemplate;
 window.loadFilterTemplates = loadFilterTemplates;
+window.clearActiveTemplate = async function () {
+	// 1) Clear active template selection and UI highlight
+	activeTemplate = null;
+	renderTemplateList(filterTemplates);
+
+	// 2) Reset filters to defaults
+	currentFilters = { ...DEFAULT_FILTERS };
+	Object.keys(currentFilters).forEach((filterKey) => {
+		const value = currentFilters[filterKey];
+		const radio = document.querySelector(
+			`input[name="${filterKey}Filter"][value="${value}"]`
+		);
+		if (radio) radio.checked = true;
+	});
+	updateAppliedFilters();
+
+	// 3) Reset sidebar selections to All
+	const resetGroup = (name) => {
+		const inputs = document.querySelectorAll(`input[name="${name}"]`);
+		inputs.forEach((i) => (i.checked = i.value === 'all'));
+	};
+	resetGroup('seller');
+	resetGroup('category');
+	resetGroup('source');
+	window.selectedSellers = [];
+	window.selectedCategories = [];
+	window.selectedSources = [];
+
+	// 4) Reset sort to default: Date: Newest to Oldest
+	const sortText = document.getElementById('sortText');
+	if (sortText) sortText.textContent = 'Date: Newest to Oldest';
+	await sortProducts('date_desc');
+
+	// 5) Close dropdown and reset button label
+	const quickFilterText = document.getElementById('quickFilterText');
+	if (quickFilterText) quickFilterText.textContent = 'Save Template';
+	const dropdown = document.getElementById('quickFilterDropdown');
+	if (dropdown) dropdown.classList.remove('show');
+
+	// 6) Re-filter products with defaults
+	await filterProducts();
+};
 
 async function importFeeRulesFromExcel(input) {
 	try {
