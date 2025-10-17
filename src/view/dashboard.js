@@ -2628,6 +2628,18 @@ async function testDatabase() {
 	}
 }
 
+function getResearchCategoryNameById(id) {
+	try {
+		const arr = Array.isArray(window.researchCategories)
+			? window.researchCategories
+			: [];
+		const found = arr.find((c) => c._id === id || c.id === id);
+		return found ? found.name : null;
+	} catch (_) {
+		return null;
+	}
+}
+
 window.onload = async () => {
 	// Test database first
 	await testDatabase();
@@ -2651,6 +2663,43 @@ window.onload = async () => {
 	}
 
 	await loadSidebar();
+
+	// Preselect category based on categoryId from URL
+	if (categoryIdParam) {
+		const targetName = getResearchCategoryNameById(categoryIdParam);
+		if (targetName) {
+			// Ensure the category list contains the target (expand if needed)
+			let input = document.querySelector(
+				`input[name="category"][value="${CSS.escape(targetName)}"]`
+			);
+			if (!input && Array.isArray(window.allCategories)) {
+				// Render all categories to make the target available
+				try {
+					showAllItems('category', window.allCategories);
+					input = document.querySelector(
+						`input[name="category"][value="${CSS.escape(
+							targetName
+						)}"]`
+					);
+				} catch (e) {
+					console.warn(
+						'Failed to expand category list for preselect',
+						e
+					);
+				}
+			}
+			if (input) {
+				// Uncheck "All" and check the specific category
+				const allCb = document.querySelector(
+					'input[name="category"][value="all"]'
+				);
+				if (allCb) allCb.checked = false;
+				input.checked = true;
+				window.selectedCategories = [targetName];
+			}
+		}
+	}
+
 	await loadProducts();
 
 	// Apply default sort: Date: Newest to Oldest
